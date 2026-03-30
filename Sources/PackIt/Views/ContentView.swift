@@ -10,13 +10,15 @@ struct ContentView: View {
     var body: some View {
         @Bindable var store = store
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(selection: $store.navigation)
+            SidebarView(selection: $store.sidebarSelection)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
-        } detail: {
-            DetailRouter(
+        } content: {
+            ContentListView(
                 showNewTemplateSheet: $showNewTemplateSheet,
                 showNewTripSheet: $showNewTripSheet
             )
+        } detail: {
+            DetailView()
         }
         .onAppear {
             store.loadAll()
@@ -42,44 +44,47 @@ struct ContentView: View {
                 } label: {
                     Label("New Template", systemImage: "doc.badge.plus")
                 }
-                .help("New template")
+                .help("New template (⌘N)")
 
                 Button {
                     showNewTripSheet = true
                 } label: {
                     Label("New Trip", systemImage: "suitcase.rolling")
                 }
-                .help("New trip")
+                .help("New trip (⌘⇧N)")
             }
         }
         .keyboardShortcut("n", modifiers: .command) {
             showNewTemplateSheet = true
         }
+        .keyboardShortcut("n", modifiers: [.command, .shift]) {
+            showNewTripSheet = true
+        }
         .keyboardShortcut("k", modifiers: .command) {
             showQuickSearch = true
         }
         .frame(minWidth: 900, minHeight: 500)
-        .overlay {
+        .overlay(alignment: .top) {
             if let error = store.error {
-                VStack {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.yellow)
-                        Text(error)
-                            .font(.callout)
-                        Spacer()
-                        Button("Dismiss") {
-                            store.error = nil
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-                    .padding(12)
-                    .background(.red.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .padding()
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.yellow)
+                    Text(error)
+                        .font(.callout)
                     Spacer()
+                    Button("Dismiss") {
+                        store.error = nil
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
+                .padding(12)
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(radius: 4)
+                .padding()
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .animation(.easeInOut, value: store.error)
             }
         }
     }

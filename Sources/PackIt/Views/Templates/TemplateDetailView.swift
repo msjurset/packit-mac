@@ -15,12 +15,7 @@ struct TemplateDetailView: View {
                     LabeledContent("Tags") {
                         HStack(spacing: 4) {
                             ForEach(template.contextTags, id: \.self) { tag in
-                                Text(tag)
-                                    .font(.caption)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .background(.blue.opacity(0.1))
-                                    .clipShape(Capsule())
+                                StyledTag(name: tag)
                             }
                         }
                     }
@@ -89,16 +84,14 @@ struct TemplateItemRow: View {
     let item: TemplateItem
 
     var body: some View {
-        HStack {
-            Image(systemName: item.priority.icon)
-                .foregroundStyle(priorityColor(item.priority))
-                .font(.caption)
+        HStack(spacing: 8) {
+            PriorityBadge(priority: item.priority)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.name)
                 if let notes = item.notes, !notes.isEmpty {
                     Text(notes)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.tertiary)
                         .lineLimit(1)
                 }
             }
@@ -106,24 +99,10 @@ struct TemplateItemRow: View {
             if !item.contextTags.isEmpty {
                 HStack(spacing: 4) {
                     ForEach(item.contextTags.prefix(2), id: \.self) { tag in
-                        Text(tag)
-                            .font(.caption2)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(.blue.opacity(0.1))
-                            .clipShape(Capsule())
+                        StyledTag(name: tag)
                     }
                 }
             }
-        }
-    }
-
-    private func priorityColor(_ priority: Priority) -> Color {
-        switch priority {
-        case .low: return .gray
-        case .medium: return .blue
-        case .high: return .orange
-        case .critical: return .red
         }
     }
 }

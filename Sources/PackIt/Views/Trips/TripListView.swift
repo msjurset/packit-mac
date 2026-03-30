@@ -5,8 +5,10 @@ struct TripListView: View {
     let trips: [TripInstance]
     let title: String
     @Binding var showNewTripSheet: Bool
+    @State private var tripToDelete: TripInstance?
 
     var body: some View {
+        @Bindable var store = store
         Group {
             if trips.isEmpty {
                 ContentUnavailableView {
@@ -18,27 +20,46 @@ struct TripListView: View {
                         showNewTripSheet = true
                     }
                     .buttonStyle(.borderedProminent)
+                    .tint(.packitTeal)
                 }
             } else {
-                List {
+                List(selection: $store.selectedTripID) {
                     ForEach(trips) { trip in
                         TripRow(trip: trip)
-                            .tag(NavigationItem.tripDetail(trip.id))
-                            .onTapGesture(count: 1) {
-                                store.navigation = .tripDetail(trip.id)
-                                store.selectedTripID = trip.id
-                            }
+                            .tag(trip.id)
                             .contextMenu {
+                                if trip.status == .planning {
+                                    Button {
+                                        var updated = trip
+                                        updated.status = .active
+                                        store.updateTrip(updated)
+                                    } label: {
+                                        Label("Start Packing", systemImage: "suitcase.fill")
+                                    }
+                                }
+                                if trip.status == .active {
+                                    Button {
+                                        var updated = trip
+                                        updated.status = .completed
+                                        store.updateTrip(updated)
+                                    } label: {
+                                        Label("Mark Completed", systemImage: "checkmark.circle")
+                                    }
+                                }
                                 if trip.status != .archived {
-                                    Button("Archive") {
+                                    Button {
                                         var updated = trip
                                         updated.status = .archived
                                         store.updateTrip(updated)
+                                    } label: {
+                                        Label("Archive", systemImage: "archivebox")
                                     }
                                 }
                                 Divider()
-                                Button("Delete", role: .destructive) {
-                                    store.deleteTrip(id: trip.id)
+                                Button(role: .destructive) {
+                                    tripToDelete = trip
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
                                 }
                             }
                     }
@@ -46,6 +67,22 @@ struct TripListView: View {
             }
         }
         .navigationTitle(title)
+        .alert("Delete Trip?", isPresented: .init(
+            get: { tripToDelete != nil },
+            set: { if !$0 { tripToDelete = nil } }
+        )) {
+            Button("Cancel", role: .cancel) { tripToDelete = nil }
+            Button("Delete", role: .destructive) {
+                if let trip = tripToDelete {
+                    store.deleteTrip(id: trip.id)
+                }
+                tripToDelete = nil
+            }
+        } message: {
+            if let trip = tripToDelete {
+                Text("This will permanently delete \"\(trip.name)\" and all its items.")
+            }
+        }
     }
 }
 
@@ -59,7 +96,8 @@ struct TripRow: View {
                     .font(.headline)
                 Spacer()
                 Image(systemName: trip.status.icon)
-                    .foregroundStyle(statusColor)
+                    .foregroundStyle(Color.statusColor(trip.status))
+                    .font(.callout)
             }
             HStack(spacing: 12) {
                 Label(trip.departureDate.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
@@ -67,28 +105,26 @@ struct TripRow: View {
                     .foregroundStyle(.secondary)
 
                 ProgressView(value: trip.progress)
+                    .tint(progressTint)
                     .frame(width: 60)
 
                 Text("\(trip.packedCount)/\(trip.totalItems)")
-                    .font(.caption)
+                    .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
 
                 if !trip.overdueItems.isEmpty {
                     Label("\(trip.overdueItems.count) overdue", systemImage: "exclamationmark.triangle.fill")
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(.packitRed)
                 }
             }
         }
         .padding(.vertical, 4)
     }
 
-    private var statusColor: Color {
-        switch trip.status {
-        case .planning: return .blue
-        case .active: return .green
-        case .completed: return .secondary
-        case .archived: return .secondary
-        }
+    private var progressTint: Color {
+        if trip.progress >= 1.0 { return .packitGreen }
+        if trip.progress >= 0.5 { return .packitTeal }
+        return .orange
     }
 }

@@ -4,36 +4,41 @@ struct PackingItemRow: View {
     @Environment(PackItStore.self) private var store
     let item: TripItem
     let tripID: UUID
+    @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             Button {
-                store.togglePacked(tripID: tripID, itemID: item.id)
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    store.togglePacked(tripID: tripID, itemID: item.id)
+                }
             } label: {
                 Image(systemName: item.isPacked ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(item.isPacked ? .green : itemColor)
+                    .foregroundStyle(item.isPacked ? .packitGreen : itemColor)
+                    .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.plain)
 
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
                     Text(item.name)
                         .strikethrough(item.isPacked)
                         .foregroundStyle(item.isPacked ? .secondary : .primary)
                     if item.isAdHoc {
                         Text("new")
-                            .font(.caption2)
-                            .padding(.horizontal, 4)
+                            .font(.caption2.weight(.medium))
+                            .padding(.horizontal, 5)
                             .padding(.vertical, 1)
-                            .background(.purple.opacity(0.15))
+                            .background(.purple.opacity(0.12))
+                            .foregroundStyle(.purple)
                             .clipShape(Capsule())
                     }
                 }
                 if let notes = item.notes, !notes.isEmpty {
                     Text(notes)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.tertiary)
                         .lineLimit(1)
                 }
             }
@@ -43,47 +48,44 @@ struct PackingItemRow: View {
             if let due = item.dueDate {
                 Text(due.formatted(date: .abbreviated, time: .omitted))
                     .font(.caption)
-                    .foregroundStyle(item.isOverdue ? .red : .secondary)
+                    .foregroundStyle(item.isOverdue ? .packitRed : .secondary)
             }
 
-            Image(systemName: item.priority.icon)
-                .font(.caption)
-                .foregroundStyle(priorityColor)
+            PriorityBadge(priority: item.priority)
         }
-        .padding(.vertical, 3)
-        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .padding(.horizontal, 10)
         .background(itemBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .onHover { isHovered = $0 }
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .animation(.easeInOut(duration: 0.2), value: item.isPacked)
         .contextMenu {
-            Button("Remove", role: .destructive) {
+            Button(role: .destructive) {
                 store.removeItem(from: tripID, itemID: item.id)
+            } label: {
+                Label("Remove", systemImage: "trash")
             }
         }
     }
 
     private var itemColor: Color {
         if item.isOverdue && item.priority >= .high {
-            return .red
+            return .packitRed
         }
         return .secondary
     }
 
     private var itemBackground: Color {
         if item.isPacked {
-            return .green.opacity(0.05)
+            return .packitGreen.opacity(0.06)
         }
         if item.isOverdue && item.priority >= .high {
-            return .red.opacity(0.08)
+            return .packitRed.opacity(0.06)
+        }
+        if isHovered {
+            return .primary.opacity(0.03)
         }
         return .clear
-    }
-
-    private var priorityColor: Color {
-        switch item.priority {
-        case .low: return .gray
-        case .medium: return .blue
-        case .high: return .orange
-        case .critical: return .red
-        }
     }
 }

@@ -8,15 +8,15 @@ struct TagChip: View {
     var body: some View {
         Button(action: action) {
             Text(name)
-                .font(.caption)
+                .font(.caption.weight(.medium))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
-                .background(isSelected ? Color.blue.opacity(0.2) : Color.secondary.opacity(0.1))
-                .foregroundStyle(isSelected ? .blue : .primary)
+                .background(isSelected ? Color.packitTeal.opacity(0.15) : Color.secondary.opacity(0.08))
+                .foregroundStyle(isSelected ? .packitTeal : .primary)
                 .clipShape(Capsule())
                 .overlay(
                     Capsule()
-                        .strokeBorder(isSelected ? Color.blue.opacity(0.4) : Color.clear, lineWidth: 1)
+                        .strokeBorder(isSelected ? Color.packitTeal.opacity(0.4) : Color.clear, lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)

@@ -3,17 +3,24 @@ import SwiftUI
 struct TripDetailView: View {
     @Environment(PackItStore.self) private var store
     let trip: TripInstance
-    @State private var showEditSheet = false
-    @State private var showAddItemSheet = false
-    @State private var showAddTodoSheet = false
-    @State private var showMergeSheet = false
-    @State private var showExportSheet = false
-    @State private var showNotesEditor = false
+    @State private var activeSheet: TripSheet?
     @State private var pendingReminders = 0
+    @State private var showDeleteConfirm = false
+
+    enum TripSheet: Identifiable {
+        case edit
+        case addItem
+        case addTodo
+        case editNotes
+        case merge
+        case export
+
+        var id: String { String(describing: self) }
+    }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 20) {
                 tripHeader
                     .padding(.horizontal)
 
@@ -25,15 +32,11 @@ struct TripDetailView: View {
                 packingSection
                     .padding(.horizontal)
 
-                if !trip.todos.isEmpty || showAddTodoSheet {
-                    todoSection
-                        .padding(.horizontal)
-                }
+                todoSection
+                    .padding(.horizontal)
 
-                if !trip.scratchNotes.isEmpty || showNotesEditor {
-                    notesSection
-                        .padding(.horizontal)
-                }
+                notesSection
+                    .padding(.horizontal)
             }
             .padding(.vertical)
         }
@@ -41,49 +44,54 @@ struct TripDetailView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Menu {
-                    Button { showAddItemSheet = true } label: {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                    Button { showAddTodoSheet = true } label: {
-                        Label("Add Todo", systemImage: "checklist")
-                    }
-                    Button { showNotesEditor = true } label: {
-                        Label("Edit Notes", systemImage: "note.text")
-                    }
-                    Divider()
-                    statusMenu
-                    Divider()
-                    if trip.adHocItems.count > 0 {
-                        Button { showMergeSheet = true } label: {
-                            Label("Merge to Template...", systemImage: "arrow.up.doc")
+                    Section {
+                        Button { activeSheet = .addItem } label: {
+                            Label("Add Item", systemImage: "plus.circle")
+                        }
+                        Button { activeSheet = .addTodo } label: {
+                            Label("Add Todo", systemImage: "checklist")
+                        }
+                        Button { activeSheet = .editNotes } label: {
+                            Label("Edit Notes", systemImage: "note.text")
                         }
                     }
-                    Button { showExportSheet = true } label: {
-                        Label("Export...", systemImage: "square.and.arrow.up")
+                    Section("Status") {
+                        statusMenuItems
+                    }
+                    Section {
+                        if !trip.adHocItems.isEmpty {
+                            Button { activeSheet = .merge } label: {
+                                Label("Merge to Template...", systemImage: "arrow.up.doc")
+                            }
+                        }
+                        Button { activeSheet = .export } label: {
+                            Label("Export...", systemImage: "square.and.arrow.up")
+                        }
                     }
                 } label: {
                     Label("Actions", systemImage: "ellipsis.circle")
                 }
 
-                Button { showEditSheet = true } label: {
+                Button { activeSheet = .edit } label: {
                     Label("Edit", systemImage: "pencil")
                 }
             }
         }
-        .sheet(isPresented: $showEditSheet) {
-            TripEditorSheet(trip: trip)
-        }
-        .sheet(isPresented: $showAddItemSheet) {
-            AddTripItemSheet(tripID: trip.id)
-        }
-        .sheet(isPresented: $showAddTodoSheet) {
-            AddTodoSheet(tripID: trip.id)
-        }
-        .sheet(isPresented: $showMergeSheet) {
-            MergeToTemplateSheet(trip: trip)
-        }
-        .sheet(isPresented: $showExportSheet) {
-            ExportSheet(trip: trip)
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .edit:
+                TripEditorSheet(trip: trip)
+            case .addItem:
+                AddTripItemSheet(tripID: trip.id)
+            case .addTodo:
+                AddTodoSheet(tripID: trip.id)
+            case .editNotes:
+                NotesEditorSheet(trip: trip)
+            case .merge:
+                MergeToTemplateSheet(trip: trip)
+            case .export:
+                ExportSheet(trip: trip)
+            }
         }
         .task {
             pendingReminders = await NotificationService.shared.pendingCount(for: trip.id)
@@ -93,14 +101,15 @@ struct TripDetailView: View {
     // MARK: - Header
 
     private var tripHeader: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
                         Image(systemName: trip.status.icon)
-                            .foregroundStyle(statusColor)
+                            .foregroundStyle(Color.statusColor(trip.status))
+                            .font(.title3)
                         Text(trip.status.label)
-                            .font(.subheadline)
+                            .font(.subheadline.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
                     HStack(spacing: 16) {
@@ -110,61 +119,87 @@ struct TripDetailView: View {
                         }
                     }
                     .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                    if pendingReminders > 0 {
+                        Label("\(pendingReminders) reminder\(pendingReminders == 1 ? "" : "s") set", systemImage: "bell.fill")
+                            .font(.caption)
+                            .foregroundStyle(.packitTeal)
+                    }
                 }
                 Spacer()
-                VStack(alignment: .trailing) {
-                    Text("\(trip.packedCount) / \(trip.totalItems)")
-                        .font(.title2.bold())
-                    ProgressView(value: trip.progress)
-                        .frame(width: 100)
-                    Text("packed")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if pendingReminders > 0 {
-                Label("\(pendingReminders) reminder\(pendingReminders == 1 ? "" : "s") scheduled", systemImage: "bell.fill")
-                    .font(.caption)
-                    .foregroundStyle(.blue)
+                progressRing
             }
 
             if trip.isDepartureSoon && trip.status == .active {
                 Label("Departure is soon!", systemImage: "exclamationmark.triangle.fill")
                     .font(.callout.bold())
                     .foregroundStyle(.orange)
-                    .padding(8)
+                    .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.orange.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .background(.orange.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
             }
         }
+    }
+
+    private var progressRing: some View {
+        VStack(spacing: 4) {
+            ZStack {
+                Circle()
+                    .stroke(.secondary.opacity(0.15), lineWidth: 6)
+                Circle()
+                    .trim(from: 0, to: trip.progress)
+                    .stroke(progressColor, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeInOut(duration: 0.4), value: trip.progress)
+                Text("\(Int(trip.progress * 100))%")
+                    .font(.caption2.bold().monospacedDigit())
+            }
+            .frame(width: 52, height: 52)
+            Text("\(trip.packedCount)/\(trip.totalItems)")
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var progressColor: Color {
+        if trip.progress >= 1.0 { return .packitGreen }
+        if trip.progress >= 0.5 { return .packitTeal }
+        return .orange
     }
 
     // MARK: - Overdue Section
 
     private var overdueSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("Overdue High-Priority Items", systemImage: "exclamationmark.triangle.fill")
+            Label("Needs Attention", systemImage: "exclamationmark.triangle.fill")
                 .font(.headline)
-                .foregroundStyle(.red)
+                .foregroundStyle(.packitRed)
 
             ForEach(trip.overdueItems) { item in
-                HStack {
-                    Image(systemName: item.isPacked ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(item.isPacked ? .green : .red)
+                HStack(spacing: 10) {
+                    Button {
+                        store.togglePacked(tripID: trip.id, itemID: item.id)
+                    } label: {
+                        Image(systemName: item.isPacked ? "checkmark.circle.fill" : "circle")
+                            .font(.title3)
+                            .foregroundStyle(item.isPacked ? .packitGreen : .packitRed)
+                    }
+                    .buttonStyle(.plain)
+
                     Text(item.name)
                         .font(.callout.bold())
                     Spacer()
                     if let due = item.dueDate {
-                        Text(due.formatted(date: .abbreviated, time: .omitted))
+                        Text("Due " + due.formatted(date: .abbreviated, time: .omitted))
                             .font(.caption)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(.packitRed)
                     }
                 }
-                .padding(8)
-                .background(.red.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .padding(10)
+                .background(.packitRed.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
     }
@@ -175,18 +210,30 @@ struct TripDetailView: View {
         let grouped = Dictionary(grouping: trip.items, by: { $0.category ?? "Uncategorized" })
         let sortedKeys = grouped.keys.sorted()
 
-        return VStack(alignment: .leading, spacing: 12) {
-            Text("Packing List")
-                .font(.headline)
+        return VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Packing List")
+                    .font(.headline)
+                Spacer()
+                Button { activeSheet = .addItem } label: {
+                    Label("Add Item", systemImage: "plus.circle")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.packitTeal)
+            }
 
             ForEach(sortedKeys, id: \.self) { category in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(category)
-                        .font(.subheadline.bold())
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(category.uppercased())
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
+                        .padding(.leading, 4)
 
-                    ForEach(grouped[category] ?? []) { item in
-                        PackingItemRow(item: item, tripID: trip.id)
+                    VStack(spacing: 2) {
+                        ForEach(grouped[category] ?? []) { item in
+                            PackingItemRow(item: item, tripID: trip.id)
+                        }
                     }
                 }
             }
@@ -201,41 +248,49 @@ struct TripDetailView: View {
                 Text("TODOs")
                     .font(.headline)
                 Spacer()
-                Button {
-                    showAddTodoSheet = true
-                } label: {
-                    Image(systemName: "plus.circle")
+                Button { activeSheet = .addTodo } label: {
+                    Label("Add", systemImage: "plus.circle")
+                        .font(.caption)
                 }
                 .buttonStyle(.plain)
+                .foregroundStyle(.packitTeal)
             }
 
-            ForEach(trip.todos) { todo in
-                HStack {
-                    Button {
-                        store.toggleTodo(tripID: trip.id, todoID: todo.id)
-                    } label: {
-                        Image(systemName: todo.isComplete ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(todo.isComplete ? .green : .secondary)
+            if trip.todos.isEmpty {
+                Text("No TODOs yet.")
+                    .font(.callout)
+                    .foregroundStyle(.tertiary)
+                    .padding(.vertical, 4)
+            } else {
+                ForEach(trip.todos) { todo in
+                    HStack(spacing: 10) {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                store.toggleTodo(tripID: trip.id, todoID: todo.id)
+                            }
+                        } label: {
+                            Image(systemName: todo.isComplete ? "checkmark.circle.fill" : "circle")
+                                .font(.body)
+                                .foregroundStyle(todo.isComplete ? .packitGreen : .secondary)
+                        }
+                        .buttonStyle(.plain)
+
+                        Text(todo.text)
+                            .strikethrough(todo.isComplete)
+                            .foregroundStyle(todo.isComplete ? .secondary : .primary)
+
+                        Spacer()
+
+                        if let due = todo.dueDate {
+                            Text(due.formatted(date: .abbreviated, time: .omitted))
+                                .font(.caption)
+                                .foregroundStyle(todo.isOverdue ? .packitRed : .secondary)
+                        }
+
+                        PriorityBadge(priority: todo.priority)
                     }
-                    .buttonStyle(.plain)
-
-                    Text(todo.text)
-                        .strikethrough(todo.isComplete)
-                        .foregroundStyle(todo.isComplete ? .secondary : .primary)
-
-                    Spacer()
-
-                    if let due = todo.dueDate {
-                        Text(due.formatted(date: .abbreviated, time: .omitted))
-                            .font(.caption)
-                            .foregroundStyle(todo.isOverdue ? .red : .secondary)
-                    }
-
-                    Image(systemName: todo.priority.icon)
-                        .font(.caption)
-                        .foregroundStyle(priorityColor(todo.priority))
+                    .padding(.vertical, 3)
                 }
-                .padding(.vertical, 2)
             }
         }
     }
@@ -244,22 +299,30 @@ struct TripDetailView: View {
 
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Notes")
-                .font(.headline)
-            Text(trip.scratchNotes.isEmpty ? "No notes yet." : trip.scratchNotes)
-                .foregroundStyle(trip.scratchNotes.isEmpty ? .secondary : .primary)
+            HStack {
+                Text("Notes")
+                    .font(.headline)
+                Spacer()
+                Button { activeSheet = .editNotes } label: {
+                    Label("Edit", systemImage: "pencil")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.packitTeal)
+            }
+            Text(trip.scratchNotes.isEmpty ? "Tap Edit to add notes..." : trip.scratchNotes)
+                .foregroundStyle(trip.scratchNotes.isEmpty ? .tertiary : .primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(8)
-                .background(.secondary.opacity(0.05))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .onTapGesture { showNotesEditor = true }
+                .padding(10)
+                .background(.secondary.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }
 
-    // MARK: - Status Menu
+    // MARK: - Status Menu Items
 
     @ViewBuilder
-    private var statusMenu: some View {
+    private var statusMenuItems: some View {
         ForEach(TripStatus.allCases, id: \.self) { status in
             if status != trip.status {
                 Button {
@@ -272,22 +335,44 @@ struct TripDetailView: View {
             }
         }
     }
+}
 
-    private var statusColor: Color {
-        switch trip.status {
-        case .planning: return .blue
-        case .active: return .green
-        case .completed: return .secondary
-        case .archived: return .secondary
-        }
-    }
+// MARK: - Notes Editor Sheet
 
-    private func priorityColor(_ priority: Priority) -> Color {
-        switch priority {
-        case .low: return .gray
-        case .medium: return .blue
-        case .high: return .orange
-        case .critical: return .red
+struct NotesEditorSheet: View {
+    @Environment(PackItStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
+    let trip: TripInstance
+    @State private var notes: String = ""
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Text("Trip Notes")
+                .font(.headline)
+                .padding()
+
+            TextEditor(text: $notes)
+                .font(.body)
+                .padding(.horizontal)
+                .frame(minHeight: 200)
+
+            Divider()
+
+            HStack {
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("Save") {
+                    var updated = trip
+                    updated.scratchNotes = notes
+                    store.updateTrip(updated)
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+            .padding()
         }
+        .frame(width: 500, height: 350)
+        .onAppear { notes = trip.scratchNotes }
     }
 }

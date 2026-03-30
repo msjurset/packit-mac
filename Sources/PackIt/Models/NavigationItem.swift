@@ -1,13 +1,11 @@
 import Foundation
 
-enum NavigationItem: Hashable {
+enum SidebarItem: String, Hashable, CaseIterable {
     case templates
-    case templateDetail(UUID)
     case tripsPlanning
     case tripsActive
     case tripsCompleted
     case tripsArchived
-    case tripDetail(UUID)
     case tags
     case search
 }

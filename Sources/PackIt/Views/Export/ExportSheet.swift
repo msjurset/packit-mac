@@ -105,42 +105,54 @@ struct ExportSheet: View {
         }
     }
 
+    private func esc(_ text: String) -> String {
+        text.replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+    }
+
     private func generateHTML() -> String {
+        let name = esc(trip.name)
         var html = """
         <!DOCTYPE html>
         <html><head><meta charset="UTF-8">
-        <title>\(trip.name) - Packing List</title>
+        <title>\(name) - Packing List</title>
         <style>
-        body { font-family: -apple-system, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; }
-        h1 { color: #1a7a7a; border-bottom: 2px solid #1a7a7a; padding-bottom: 8px; }
-        h2 { color: #555; margin-top: 24px; }
-        .meta { color: #666; font-size: 0.9em; margin-bottom: 20px; }
-        .item { padding: 6px 0; border-bottom: 1px solid #eee; }
-        .packed { color: #999; text-decoration: line-through; }
-        .priority-high { color: #e67e22; }
-        .priority-critical { color: #e74c3c; font-weight: bold; }
-        .checkbox { width: 16px; height: 16px; margin-right: 8px; vertical-align: middle; }
-        .todo { padding: 4px 0; }
-        .notes { background: #f8f8f8; padding: 12px; border-radius: 6px; margin-top: 16px; }
-        @media print { body { margin: 20px; } }
+        * { box-sizing: border-box; }
+        body { font-family: -apple-system, Helvetica Neue, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 24px; color: #2c3e50; line-height: 1.5; }
+        h1 { color: #1a7a7a; border-bottom: 3px solid #1a7a7a; padding-bottom: 10px; font-size: 28px; }
+        h2 { color: #1a7a7a; margin-top: 28px; font-size: 18px; border-bottom: 1px solid #e0e0e0; padding-bottom: 6px; }
+        .meta { color: #7f8c8d; font-size: 14px; margin-bottom: 24px; }
+        .item { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; }
+        .item:hover { background: #f8fafa; }
+        .packed { color: #95a5a6; }
+        .packed span { text-decoration: line-through; }
+        .priority-high span { color: #e67e22; font-weight: 500; }
+        .priority-critical span { color: #e74c3c; font-weight: 600; }
+        .checkbox { width: 18px; height: 18px; margin-right: 10px; accent-color: #1a7a7a; }
+        .todo { padding: 6px 12px; display: flex; align-items: center; }
+        .notes { background: #f7f9f9; padding: 16px; border-radius: 8px; margin-top: 16px; border: 1px solid #e8eded; white-space: pre-wrap; }
+        .progress { font-size: 14px; color: #1a7a7a; font-weight: 600; }
+        @media print { body { margin: 20px; font-size: 12px; } .item:hover { background: none; } }
         </style></head><body>
-        <h1>\(trip.name)</h1>
+        <h1>\(name)</h1>
         <div class="meta">
         Departure: \(trip.departureDate.formatted(date: .long, time: .omitted))
         """
         if let ret = trip.returnDate {
-            html += " | Return: \(ret.formatted(date: .long, time: .omitted))"
+            html += " &middot; Return: \(ret.formatted(date: .long, time: .omitted))"
         }
-        html += " | \(trip.packedCount)/\(trip.totalItems) packed</div>"
+        html += " &middot; <span class=\"progress\">\(trip.packedCount)/\(trip.totalItems) packed</span></div>"
 
         let grouped = Dictionary(grouping: trip.items, by: { $0.category ?? "Uncategorized" })
         for category in grouped.keys.sorted() {
-            html += "<h2>\(category)</h2>"
+            html += "<h2>\(esc(category))</h2>"
             for item in grouped[category] ?? [] {
                 let cls = item.isPacked ? "item packed" : "item"
                 let priorityCls = item.priority >= .high ? " priority-\(item.priority.rawValue)" : ""
                 let check = item.isPacked ? "checked" : ""
-                html += "<div class=\"\(cls)\"><input type=\"checkbox\" class=\"checkbox\" \(check) disabled><span class=\"\(priorityCls)\">\(item.name)</span></div>"
+                html += "<div class=\"\(cls)\(priorityCls)\"><input type=\"checkbox\" class=\"checkbox\" \(check)><span>\(esc(item.name))</span></div>"
             }
         }
 
@@ -149,12 +161,12 @@ struct ExportSheet: View {
             for todo in trip.todos {
                 let check = todo.isComplete ? "checked" : ""
                 let cls = todo.isComplete ? "todo packed" : "todo"
-                html += "<div class=\"\(cls)\"><input type=\"checkbox\" class=\"checkbox\" \(check) disabled> \(todo.text)</div>"
+                html += "<div class=\"\(cls)\"><input type=\"checkbox\" class=\"checkbox\" \(check)> <span>\(esc(todo.text))</span></div>"
             }
         }
 
         if !trip.scratchNotes.isEmpty {
-            html += "<h2>Notes</h2><div class=\"notes\">\(trip.scratchNotes)</div>"
+            html += "<h2>Notes</h2><div class=\"notes\">\(esc(trip.scratchNotes))</div>"
         }
 
         html += "</body></html>"
