@@ -32,4 +32,7 @@ clean:
 test:
 	swift test
 
-.PHONY: build bundle icon deploy clean test
+seed:
+	swift scripts/seed-templates.swift
+
+.PHONY: build bundle icon deploy clean test seed
