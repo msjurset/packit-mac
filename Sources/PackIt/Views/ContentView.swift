@@ -1,0 +1,96 @@
+import SwiftUI
+
+struct ContentView: View {
+    @Environment(PackItStore.self) private var store
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var showNewTemplateSheet = false
+    @State private var showNewTripSheet = false
+    @State private var showQuickSearch = false
+
+    var body: some View {
+        @Bindable var store = store
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            SidebarView(selection: $store.navigation)
+                .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
+        } detail: {
+            DetailRouter(
+                showNewTemplateSheet: $showNewTemplateSheet,
+                showNewTripSheet: $showNewTripSheet
+            )
+        }
+        .onAppear {
+            store.loadAll()
+        }
+        .onOpenURL { url in
+            if url.pathExtension == "packitlist" {
+                store.importTrip(from: url)
+            }
+        }
+        .sheet(isPresented: $showNewTemplateSheet) {
+            TemplateEditorSheet(template: nil)
+        }
+        .sheet(isPresented: $showNewTripSheet) {
+            NewTripSheet()
+        }
+        .sheet(isPresented: $showQuickSearch) {
+            SearchView()
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button {
+                    showNewTemplateSheet = true
+                } label: {
+                    Label("New Template", systemImage: "doc.badge.plus")
+                }
+                .help("New template")
+
+                Button {
+                    showNewTripSheet = true
+                } label: {
+                    Label("New Trip", systemImage: "suitcase.rolling")
+                }
+                .help("New trip")
+            }
+        }
+        .keyboardShortcut("n", modifiers: .command) {
+            showNewTemplateSheet = true
+        }
+        .keyboardShortcut("k", modifiers: .command) {
+            showQuickSearch = true
+        }
+        .frame(minWidth: 900, minHeight: 500)
+        .overlay {
+            if let error = store.error {
+                VStack {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.yellow)
+                        Text(error)
+                            .font(.callout)
+                        Spacer()
+                        Button("Dismiss") {
+                            store.error = nil
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                    .padding(12)
+                    .background(.red.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .padding()
+                    Spacer()
+                }
+            }
+        }
+    }
+}
+
+private extension View {
+    func keyboardShortcut(_ key: KeyEquivalent, modifiers: EventModifiers, action: @escaping () -> Void) -> some View {
+        background(
+            Button("") { action() }
+                .keyboardShortcut(key, modifiers: modifiers)
+                .hidden()
+        )
+    }
+}
