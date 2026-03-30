@@ -34,6 +34,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
     case packingChecklist
     case merging
     case exporting
+    case reminders
     case shortcuts
 
     var id: String { rawValue }
@@ -47,6 +48,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .packingChecklist: return "Packing Checklist"
         case .merging: return "Merging Items"
         case .exporting: return "Exporting & Sharing"
+        case .reminders: return "Reminders"
         case .shortcuts: return "Keyboard Shortcuts"
         }
     }
@@ -60,6 +62,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .packingChecklist: return "checklist"
         case .merging: return "arrow.up.doc"
         case .exporting: return "square.and.arrow.up"
+        case .reminders: return "bell"
         case .shortcuts: return "keyboard"
         }
     }
@@ -186,6 +189,27 @@ enum HelpTopic: String, CaseIterable, Identifiable {
             Sharing with Others:
             - Export as .packitlist and send via AirDrop or email
             - The recipient can double-click the file to import it into their copy of PackIt
+            """
+
+        case .reminders:
+            return """
+            PackIt automatically schedules reminders to help you stay on track.
+
+            Departure Reminder:
+            - A notification is scheduled for the day before your departure date
+            - This fires for trips in Planning or Active status
+
+            Item Due Date Reminders:
+            - High-priority and critical items with due dates get reminders
+            - The reminder fires on the due date
+
+            How It Works:
+            - Reminders are synced automatically when you create or update a trip
+            - Completing or archiving a trip cancels its reminders
+            - The trip detail view shows how many reminders are scheduled
+            - PackIt requests notification permission on first launch
+
+            Note: If you denied notification permission, you can re-enable it in System Settings > Notifications > PackIt.
             """
 
         case .shortcuts:

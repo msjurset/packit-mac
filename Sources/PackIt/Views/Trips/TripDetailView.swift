@@ -9,6 +9,7 @@ struct TripDetailView: View {
     @State private var showMergeSheet = false
     @State private var showExportSheet = false
     @State private var showNotesEditor = false
+    @State private var pendingReminders = 0
 
     var body: some View {
         ScrollView {
@@ -84,6 +85,9 @@ struct TripDetailView: View {
         .sheet(isPresented: $showExportSheet) {
             ExportSheet(trip: trip)
         }
+        .task {
+            pendingReminders = await NotificationService.shared.pendingCount(for: trip.id)
+        }
     }
 
     // MARK: - Header
@@ -117,6 +121,12 @@ struct TripDetailView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            if pendingReminders > 0 {
+                Label("\(pendingReminders) reminder\(pendingReminders == 1 ? "" : "s") scheduled", systemImage: "bell.fill")
+                    .font(.caption)
+                    .foregroundStyle(.blue)
             }
 
             if trip.isDepartureSoon && trip.status == .active {

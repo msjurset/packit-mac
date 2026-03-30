@@ -15,10 +15,12 @@ final class PackItStore {
     var error: String?
 
     private let persistence: Persistence
+    private let notifications: NotificationService
     private var searchTask: Task<Void, Never>?
 
-    init(persistence: Persistence = .shared) {
+    init(persistence: Persistence = .shared, notifications: NotificationService = .shared) {
         self.persistence = persistence
+        self.notifications = notifications
     }
 
     var selectedTemplate: PackingTemplate? {
@@ -63,6 +65,7 @@ final class PackItStore {
                 templates.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
                 trips = try await persistence.loadTrips()
                 tags = try await persistence.loadTags()
+                _ = await notifications.requestPermission()
             } catch {
                 self.error = error.localizedDescription
             }
@@ -177,6 +180,7 @@ final class PackItStore {
         Task {
             do {
                 try await persistence.saveTrip(trip)
+                await notifications.syncReminders(trip: trip)
                 loadAll()
             } catch {
                 self.error = error.localizedDescription
@@ -191,6 +195,7 @@ final class PackItStore {
         Task {
             do {
                 try await persistence.saveTrip(updated)
+                await notifications.syncReminders(trip: updated)
                 loadAll()
             } catch {
                 self.error = error.localizedDescription
@@ -202,6 +207,7 @@ final class PackItStore {
         Task {
             do {
                 try await persistence.deleteTrip(id: id)
+                await notifications.cancelAllReminders(tripID: id)
                 if selectedTripID == id { selectedTripID = nil }
                 loadAll()
             } catch {
