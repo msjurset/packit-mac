@@ -33,12 +33,25 @@ struct DetailView: View {
     @Environment(PackItStore.self) private var store
 
     var body: some View {
-        if let template = store.selectedTemplate {
-            TemplateDetailView(template: template)
-        } else if let trip = store.selectedTrip {
-            TripDetailView(trip: trip)
-        } else {
-            ContentUnavailableView("No Selection", systemImage: "sidebar.right", description: Text("Select an item to view its details."))
+        switch store.navigation {
+        case .templates, .templateDetail:
+            if let template = store.selectedTemplate {
+                TemplateDetailView(template: template)
+            } else {
+                ContentUnavailableView("No Selection", systemImage: "doc.on.doc", description: Text("Select a template to view its items."))
+            }
+        case .tripsPlanning, .tripsActive, .tripsCompleted, .tripsArchived, .tripDetail:
+            if let trip = store.selectedTrip {
+                TripDetailView(trip: trip)
+            } else {
+                ContentUnavailableView("No Selection", systemImage: "suitcase", description: Text("Select a trip to view its details."))
+            }
+        case .tags:
+            ContentUnavailableView("Tags", systemImage: "tag", description: Text("Manage context tags in the middle column."))
+        case .search:
+            ContentUnavailableView("Search", systemImage: "magnifyingglass", description: Text("Search results appear in the middle column."))
+        case nil:
+            ContentUnavailableView("PackIt", systemImage: "suitcase", description: Text("Select a section from the sidebar."))
         }
     }
 }

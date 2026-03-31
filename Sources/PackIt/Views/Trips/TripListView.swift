@@ -12,7 +12,7 @@ struct TripListView: View {
         Group {
             if trips.isEmpty {
                 ContentUnavailableView {
-                    Label("No \(title) Trips", systemImage: "suitcase")
+                    Label("No \(title)", systemImage: "suitcase")
                 } description: {
                     Text("Create a new trip to get started.")
                 } actions: {
@@ -77,6 +77,20 @@ struct TripListView: View {
             }
         }
         .navigationTitle(title)
+        .safeAreaInset(edge: .top) {
+            HStack {
+                Spacer()
+                Button { showNewTripSheet = true } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.packitTeal)
+                }
+                .buttonStyle(.plain)
+                .help("New trip (⌘⇧N)")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+        }
         .alert("Delete Trip?", isPresented: .init(
             get: { tripToDelete != nil },
             set: { if !$0 { tripToDelete = nil } }

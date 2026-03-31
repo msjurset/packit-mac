@@ -20,6 +20,11 @@ struct PackItApp: App {
             }
         }
 
+        Settings {
+            SettingsView()
+                .environment(store)
+        }
+
         WindowGroup("PackIt Help", id: "help") {
             HelpView()
         }

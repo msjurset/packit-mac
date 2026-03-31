@@ -56,6 +56,20 @@ struct TemplateListView: View {
             }
         }
         .navigationTitle("Templates")
+        .safeAreaInset(edge: .top) {
+            HStack {
+                Spacer()
+                Button { showNewTemplateSheet = true } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.packitTeal)
+                }
+                .buttonStyle(.plain)
+                .help("New template (⌘N)")
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+        }
         .searchable(text: $store.searchQuery, prompt: "Search templates...")
         .sheet(item: $editingTemplate) { template in
             TemplateEditorSheet(template: template)

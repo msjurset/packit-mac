@@ -7,18 +7,23 @@ struct PackingItemRow: View {
     @State private var isHovered = false
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
             Button {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                     store.togglePacked(tripID: tripID, itemID: item.id)
                 }
             } label: {
                 Image(systemName: item.isPacked ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
+                    .font(.body)
                     .foregroundStyle(item.isPacked ? .packitGreen : itemColor)
                     .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.plain)
+
+            Image(systemName: item.priority.icon)
+                .font(.caption2)
+                .foregroundStyle(Color.priorityColor(item.priority))
+                .offset(y: -1)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
@@ -34,6 +39,11 @@ struct PackingItemRow: View {
                             .foregroundStyle(.purple)
                             .clipShape(Capsule())
                     }
+                    if let due = item.dueDate {
+                        Text(due.formatted(date: .abbreviated, time: .omitted))
+                            .font(.caption2)
+                            .foregroundStyle(item.isOverdue ? .packitRed : .secondary)
+                    }
                 }
                 if let notes = item.notes, !notes.isEmpty {
                     Text(notes)
@@ -42,19 +52,10 @@ struct PackingItemRow: View {
                         .lineLimit(1)
                 }
             }
-
-            Spacer()
-
-            if let due = item.dueDate {
-                Text(due.formatted(date: .abbreviated, time: .omitted))
-                    .font(.caption)
-                    .foregroundStyle(item.isOverdue ? .packitRed : .secondary)
-            }
-
-            PriorityBadge(priority: item.priority)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.vertical, 5)
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 8)
         .background(itemBackground)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .onHover { isHovered = $0 }

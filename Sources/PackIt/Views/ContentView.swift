@@ -23,6 +23,18 @@ struct ContentView: View {
         .onAppear {
             store.loadAll()
         }
+        .onChange(of: store.navigation) { oldVal, newVal in
+            let oldSection = sidebarSection(oldVal)
+            let newSection = sidebarSection(newVal)
+            if oldSection != newSection {
+                if newSection != "templates" {
+                    store.selectedTemplateID = nil
+                }
+                if newSection != "trips" {
+                    store.selectedTripID = nil
+                }
+            }
+        }
         .onOpenURL { url in
             if url.pathExtension == "packitlist" {
                 store.importTrip(from: url)
@@ -36,23 +48,6 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showQuickSearch) {
             SearchView()
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button {
-                    showNewTemplateSheet = true
-                } label: {
-                    Label("New Template", systemImage: "doc.badge.plus")
-                }
-                .help("New template (⌘N)")
-
-                Button {
-                    showNewTripSheet = true
-                } label: {
-                    Label("New Trip", systemImage: "suitcase.rolling")
-                }
-                .help("New trip (⌘⇧N)")
-            }
         }
         .keyboardShortcut("n", modifiers: .command) {
             showNewTemplateSheet = true
@@ -86,6 +81,16 @@ struct ContentView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .animation(.easeInOut, value: store.error)
             }
+        }
+    }
+
+    private func sidebarSection(_ item: NavigationItem?) -> String {
+        switch item {
+        case .templates, .templateDetail: return "templates"
+        case .tripsPlanning, .tripsActive, .tripsCompleted, .tripsArchived, .tripDetail: return "trips"
+        case .tags: return "tags"
+        case .search: return "search"
+        case nil: return ""
         }
     }
 }

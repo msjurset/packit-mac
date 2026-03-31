@@ -63,7 +63,7 @@ struct TemplateItemEditorSheet: View {
             }
             .padding()
         }
-        .frame(width: 480, height: 450)
+        .frame(width: 500, height: 550)
         .onAppear {
             if let item {
                 name = item.name

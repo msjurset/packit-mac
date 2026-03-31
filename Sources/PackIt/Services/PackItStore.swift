@@ -372,4 +372,22 @@ final class PackItStore {
             }
         }
     }
+
+    // MARK: - Config
+
+    func loadConfig() async throws -> AppConfig {
+        try await persistence.loadConfig()
+    }
+
+    func saveConfig(_ config: AppConfig) async throws {
+        try await persistence.saveConfig(config)
+    }
+
+    func printTrip(_ trip: TripInstance) {
+        Task {
+            let config = (try? await persistence.loadConfig()) ?? AppConfig()
+            let watermark = config.printWithWatermark ? config.watermarkStyle : .none
+            PrintService.print(trip: trip, watermark: watermark)
+        }
+    }
 }

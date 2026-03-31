@@ -91,6 +91,22 @@ actor Persistence {
         try data.write(to: tagsFile, options: .atomic)
     }
 
+    // MARK: - Config
+
+    func loadConfig() throws -> AppConfig {
+        let configFile = baseURL.appendingPathComponent("config.json")
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: configFile.path) else { return AppConfig() }
+        let data = try Data(contentsOf: configFile)
+        return try decoder.decode(AppConfig.self, from: data)
+    }
+
+    func saveConfig(_ config: AppConfig) throws {
+        let configFile = baseURL.appendingPathComponent("config.json")
+        let data = try encoder.encode(config)
+        try data.write(to: configFile, options: .atomic)
+    }
+
     // MARK: - Export / Import
 
     func exportTrip(_ trip: TripInstance) throws -> Data {
