@@ -24,23 +24,33 @@ struct TemplateListView: View {
             } else if store.filteredTemplates.isEmpty {
                 ContentUnavailableView.search(text: store.searchQuery)
             } else {
-                List(selection: $store.selectedTemplateID) {
+                List {
                     ForEach(store.filteredTemplates) { template in
-                        TemplateRow(template: template)
-                            .tag(template.id)
-                            .contextMenu {
-                                Button {
-                                    editingTemplate = template
-                                } label: {
-                                    Label("Edit", systemImage: "pencil")
-                                }
-                                Divider()
-                                Button(role: .destructive) {
-                                    templateToDelete = template
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
+                        Button {
+                            store.selectedTemplateID = template.id
+                            store.navigation = .templateDetail(template.id)
+                        } label: {
+                            TemplateRow(template: template)
+                        }
+                        .buttonStyle(.plain)
+                        .listRowBackground(
+                            store.selectedTemplateID == template.id
+                                ? Color.accentColor.opacity(0.15)
+                                : Color.clear
+                        )
+                        .contextMenu {
+                            Button {
+                                editingTemplate = template
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
                             }
+                            Divider()
+                            Button(role: .destructive) {
+                                templateToDelete = template
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                     }
                 }
             }

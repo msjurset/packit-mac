@@ -1,16 +1,16 @@
 import SwiftUI
 
-/// Middle column: shows list of items based on sidebar selection.
+/// Middle column: shows list based on sidebar selection.
 struct ContentListView: View {
     @Environment(PackItStore.self) private var store
     @Binding var showNewTemplateSheet: Bool
     @Binding var showNewTripSheet: Bool
 
     var body: some View {
-        switch store.sidebarSelection {
-        case .templates:
+        switch store.navigation {
+        case .templates, .templateDetail:
             TemplateListView(showNewTemplateSheet: $showNewTemplateSheet)
-        case .tripsPlanning:
+        case .tripsPlanning, .tripDetail:
             TripListView(trips: store.planningTrips, title: "Planning", showNewTripSheet: $showNewTripSheet)
         case .tripsActive:
             TripListView(trips: store.activeTrips, title: "Active Trips", showNewTripSheet: $showNewTripSheet)
@@ -28,13 +28,12 @@ struct ContentListView: View {
     }
 }
 
-/// Right column: shows detail for selected template or trip.
+/// Right column: shows detail for selected item.
 struct DetailView: View {
     @Environment(PackItStore.self) private var store
 
     var body: some View {
-        if let template = store.selectedTemplate,
-           store.sidebarSelection == .templates {
+        if let template = store.selectedTemplate {
             TemplateDetailView(template: template)
         } else if let trip = store.selectedTrip {
             TripDetailView(trip: trip)

@@ -2,44 +2,43 @@ import SwiftUI
 
 struct SidebarView: View {
     @Environment(PackItStore.self) private var store
-    @Binding var selection: SidebarItem?
+    @Binding var selection: NavigationItem?
 
     var body: some View {
         List(selection: $selection) {
             Section("Templates") {
-                Label("All Templates", systemImage: "doc.on.doc")
-                    .tag(SidebarItem.templates)
-                    .badge(store.templates.count)
+                sidebarRow("All Templates", icon: "doc.on.doc", tag: .templates, count: store.templates.count)
             }
 
             Section("Trips") {
-                Label("Planning", systemImage: "pencil.and.list.clipboard")
-                    .tag(SidebarItem.tripsPlanning)
-                    .badge(store.planningTrips.count)
-
-                Label("Active", systemImage: "suitcase.fill")
-                    .tag(SidebarItem.tripsActive)
-                    .badge(store.activeTrips.count)
-
-                Label("Completed", systemImage: "checkmark.circle.fill")
-                    .tag(SidebarItem.tripsCompleted)
-                    .badge(store.completedTrips.count)
-
-                Label("Archived", systemImage: "archivebox")
-                    .tag(SidebarItem.tripsArchived)
-                    .badge(store.archivedTrips.count)
+                sidebarRow("Planning", icon: "pencil.and.list.clipboard", tag: .tripsPlanning, count: store.planningTrips.count)
+                sidebarRow("Active", icon: "suitcase.fill", tag: .tripsActive, count: store.activeTrips.count)
+                sidebarRow("Completed", icon: "checkmark.circle.fill", tag: .tripsCompleted, count: store.completedTrips.count)
+                sidebarRow("Archived", icon: "archivebox", tag: .tripsArchived, count: store.archivedTrips.count)
             }
 
             Section("Manage") {
-                Label("Tags", systemImage: "tag")
-                    .tag(SidebarItem.tags)
-                    .badge(store.tags.count)
+                sidebarRow("Tags", icon: "tag", tag: .tags, count: store.tags.count)
 
                 Label("Search", systemImage: "magnifyingglass")
-                    .tag(SidebarItem.search)
+                    .tag(NavigationItem.search)
             }
         }
         .listStyle(.sidebar)
         .navigationTitle("PackIt")
+    }
+
+    private func sidebarRow(_ title: String, icon: String, tag: NavigationItem, count: Int) -> some View {
+        HStack {
+            Label(title, systemImage: icon)
+            Spacer()
+            if count > 0 {
+                Text("\(count)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+        }
+        .tag(tag)
     }
 }

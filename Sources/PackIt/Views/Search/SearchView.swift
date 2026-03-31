@@ -48,7 +48,7 @@ struct SearchView: View {
                                     }
                                 }
                                 .onTapGesture {
-                                    store.sidebarSelection = .templates
+                                    store.navigation = .templateDetail(template.id)
                                     store.selectedTemplateID = template.id
                                 }
                             }
@@ -70,7 +70,7 @@ struct SearchView: View {
                                     }
                                 }
                                 .onTapGesture {
-                                    store.sidebarSelection = .tripsPlanning
+                                    store.navigation = .tripDetail(trip.id)
                                     store.selectedTripID = trip.id
                                 }
                             }

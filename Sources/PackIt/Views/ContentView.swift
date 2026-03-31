@@ -10,7 +10,7 @@ struct ContentView: View {
     var body: some View {
         @Bindable var store = store
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(selection: $store.sidebarSelection)
+            SidebarView(selection: $store.navigation)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
         } content: {
             ContentListView(

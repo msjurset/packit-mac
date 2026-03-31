@@ -23,11 +23,21 @@ struct TripListView: View {
                     .tint(.packitTeal)
                 }
             } else {
-                List(selection: $store.selectedTripID) {
+                List {
                     ForEach(trips) { trip in
-                        TripRow(trip: trip)
-                            .tag(trip.id)
-                            .contextMenu {
+                        Button {
+                            store.selectedTripID = trip.id
+                            store.navigation = .tripDetail(trip.id)
+                        } label: {
+                            TripRow(trip: trip)
+                        }
+                        .buttonStyle(.plain)
+                        .listRowBackground(
+                            store.selectedTripID == trip.id
+                                ? Color.accentColor.opacity(0.15)
+                                : Color.clear
+                        )
+                        .contextMenu {
                                 if trip.status == .planning {
                                     Button {
                                         var updated = trip

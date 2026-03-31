@@ -106,7 +106,7 @@ struct NewTripSheet: View {
             templateIDs: Array(selectedTemplateIDs),
             selectedTags: Array(selectedTags)
         )
-        store.sidebarSelection = .tripsPlanning
+        store.navigation = .tripDetail(trip.id)
         store.selectedTripID = trip.id
         dismiss()
     }

@@ -8,7 +8,7 @@ final class PackItStore {
     var tags: [ContextTag] = []
 
     var searchQuery = ""
-    var sidebarSelection: SidebarItem? = .templates
+    var navigation: NavigationItem? = .templates
     var selectedTemplateID: UUID?
     var selectedTripID: UUID?
     var isLoading = false
