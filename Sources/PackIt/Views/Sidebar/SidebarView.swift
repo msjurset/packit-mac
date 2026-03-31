@@ -25,6 +25,38 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                WisdomBanner()
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .frame(maxHeight: 160)
+
+                HStack(spacing: 12) {
+                    SettingsLink {
+                        Image(systemName: "gearshape")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Settings")
+
+                    Button {
+                        NSApp.sendAction(Selector(("showHelp:")), to: nil, from: nil)
+                    } label: {
+                        Image(systemName: "questionmark.circle")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Help")
+
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .padding(.bottom, 8)
+            }
+        }
         .navigationTitle("PackIt")
     }
 

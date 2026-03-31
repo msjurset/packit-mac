@@ -2,49 +2,47 @@ import SwiftUI
 
 struct WisdomBanner: View {
     @State private var currentWisdom: TravelWisdom = TravelWisdom.all.randomElement()!
-    @State private var isVisible = true
     @State private var timer: Timer?
 
     var rotationInterval: TimeInterval = 30
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: currentWisdom.type == .tip ? "lightbulb.fill" : "quote.opening")
-                .font(.caption)
-                .foregroundStyle(currentWisdom.type == .tip ? .packitAmber : .packitTeal)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: currentWisdom.type == .tip ? "lightbulb.fill" : "quote.opening")
+                    .font(.body)
+                    .foregroundStyle(currentWisdom.type == .tip ? .packitAmber : .packitTeal)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(currentWisdom.text)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(currentWisdom.type == .tip ? "Packing Tip" : "Travel Quote")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(currentWisdom.type == .tip ? .packitAmber : .packitTeal)
 
-                if let attribution = currentWisdom.attribution {
-                    Text("— \(attribution)")
-                        .font(.caption2)
+                Spacer()
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        advance()
+                    }
+                } label: {
+                    Image(systemName: "arrow.right.circle.fill")
+                        .font(.callout)
                         .foregroundStyle(.tertiary)
                 }
+                .buttonStyle(.plain)
+                .help("Next")
             }
 
-            Spacer()
+            Text(currentWisdom.text)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
-            Button {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    advance()
-                }
-            } label: {
-                Image(systemName: "arrow.right.circle")
+            if let attribution = currentWisdom.attribution {
+                Text("— \(attribution)")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
-            .buttonStyle(.plain)
-            .help("Next tip")
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.secondary.opacity(0.04))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
         .id(currentWisdom.id)
         .transition(.asymmetric(
             insertion: .move(edge: .trailing).combined(with: .opacity),

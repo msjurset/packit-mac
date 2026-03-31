@@ -19,7 +19,7 @@ class PackingListPrintView: NSView {
     init(trip: TripInstance, printConfig: AppConfig) {
         self.trip = trip
         self.printConfig = printConfig
-        super.init(frame: .zero)
+        super.init(frame: NSRect(x: 0, y: 0, width: 612, height: 792)) // US Letter default
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -149,7 +149,11 @@ class PackingListPrintView: NSView {
         var colY: CGFloat = 0
 
         for block in blocks {
-            if block.type is Void { continue } // skip spacer markers check below
+            // Skip empty spacer blocks
+            if case .categoryHeader(let name, _, _) = block.type, name.isEmpty {
+                colY += block.height
+                continue
+            }
             let blockHeight = block.height
 
             if colY + blockHeight > usableHeight {

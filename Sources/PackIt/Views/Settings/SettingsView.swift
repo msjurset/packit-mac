@@ -179,33 +179,37 @@ struct WatermarkPreview: View {
             // White page
             context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.white))
 
-            // Render all watermark layers
+            // Render all watermark layers (flip CG context to match bottom-left origin)
             context.withCGContext { cgContext in
+                cgContext.saveGState()
+                cgContext.translateBy(x: 0, y: size.height)
+                cgContext.scaleBy(x: 1, y: -1)
                 WatermarkRenderer.draw(config: config, in: CGRect(origin: .zero, size: size), context: cgContext)
+                cgContext.restoreGState()
             }
 
-            // Simulated text lines
+            // Simulated text lines (SwiftUI Canvas coordinates: y=0 at top)
             let textColor = Color.black.opacity(0.5)
             // Title
-            context.fill(Path(CGRect(x: 20, y: size.height - 30, width: 120, height: 10)), with: .color(textColor.opacity(0.3)))
+            context.fill(Path(CGRect(x: 20, y: 20, width: 120, height: 10)), with: .color(textColor.opacity(0.3)))
             // Subtitle
-            context.fill(Path(CGRect(x: 20, y: size.height - 45, width: 80, height: 6)), with: .color(textColor.opacity(0.15)))
+            context.fill(Path(CGRect(x: 20, y: 36, width: 80, height: 6)), with: .color(textColor.opacity(0.15)))
             // Category headers + items
             let cols = 3
             let colW = (size.width - 50) / CGFloat(cols)
             for col in 0..<cols {
                 let cx = 20 + CGFloat(col) * colW
                 // Header
-                context.fill(Path(CGRect(x: cx, y: size.height - 70, width: colW * 0.6, height: 6)), with: .color(textColor.opacity(0.2)))
+                context.fill(Path(CGRect(x: cx, y: 55, width: colW * 0.6, height: 6)), with: .color(textColor.opacity(0.2)))
                 // Items
                 for i in 0..<6 {
-                    let iy = size.height - 85 - CGFloat(i) * 14
-                    guard iy > 10 else { break }
+                    let iy = 70 + CGFloat(i) * 14
+                    guard iy < size.height - 10 else { break }
                     // Checkbox circle
-                    context.stroke(Path(ellipseIn: CGRect(x: cx, y: iy - 4, width: 6, height: 6)), with: .color(textColor.opacity(0.2)), lineWidth: 0.5)
+                    context.stroke(Path(ellipseIn: CGRect(x: cx, y: iy, width: 6, height: 6)), with: .color(textColor.opacity(0.2)), lineWidth: 0.5)
                     // Text line
                     let w = [colW * 0.5, colW * 0.7, colW * 0.4, colW * 0.6, colW * 0.55, colW * 0.45][i]
-                    context.fill(Path(CGRect(x: cx + 10, y: iy - 2, width: w, height: 4)), with: .color(textColor.opacity(0.12)))
+                    context.fill(Path(CGRect(x: cx + 10, y: iy + 1, width: w, height: 4)), with: .color(textColor.opacity(0.12)))
                 }
             }
         }
