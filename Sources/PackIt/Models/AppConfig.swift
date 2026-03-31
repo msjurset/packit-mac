@@ -1,11 +1,20 @@
 import Foundation
 
 struct AppConfig: Codable {
-    var watermarkStyle: WatermarkStyle = .palmTrees
-    var printWithWatermark: Bool = true
+    var patternStyle: PatternStyle = .palmTrees
+    var fullPageStyle: FullPageStyle = .none
+    var borderStyle: BorderStyle = .none
+    var patternOpacity: Double = 0.06
+    var fullPageOpacity: Double = 0.04
+    var borderOpacity: Double = 0.10
+    var enablePattern: Bool = true
+    var enableFullPage: Bool = false
+    var enableBorder: Bool = false
 }
 
-enum WatermarkStyle: String, Codable, CaseIterable, Identifiable {
+// MARK: - Pattern (repeating tile)
+
+enum PatternStyle: String, Codable, CaseIterable, Identifiable {
     case none
     case palmTrees
     case mountains
@@ -43,6 +52,82 @@ enum WatermarkStyle: String, Codable, CaseIterable, Identifiable {
         case .worldDots: return "globe"
         case .tropicalLeaves: return "leaf.fill"
         case .anchors: return "anchor"
+        }
+    }
+}
+
+// MARK: - Full-page art (single large illustration)
+
+enum FullPageStyle: String, Codable, CaseIterable, Identifiable {
+    case none
+    case beachScene
+    case mountainLandscape
+    case largeCompass
+    case worldMap
+    case tropicalFrame
+    case nauticalChart
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .none: return "None"
+        case .beachScene: return "Beach Scene"
+        case .mountainLandscape: return "Mountain Landscape"
+        case .largeCompass: return "Compass"
+        case .worldMap: return "World Map"
+        case .tropicalFrame: return "Tropical Frame"
+        case .nauticalChart: return "Nautical Chart"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .none: return "circle.dashed"
+        case .beachScene: return "sun.horizon.fill"
+        case .mountainLandscape: return "mountain.2.fill"
+        case .largeCompass: return "safari.fill"
+        case .worldMap: return "globe.americas.fill"
+        case .tropicalFrame: return "leaf.fill"
+        case .nauticalChart: return "helm"
+        }
+    }
+}
+
+// MARK: - Border (decorative frame)
+
+enum BorderStyle: String, Codable, CaseIterable, Identifiable {
+    case none
+    case simpleLine
+    case doubleLine
+    case rope
+    case vine
+    case passportStamps
+    case ticketEdge
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .none: return "None"
+        case .simpleLine: return "Simple Line"
+        case .doubleLine: return "Double Line"
+        case .rope: return "Rope"
+        case .vine: return "Vine & Leaves"
+        case .passportStamps: return "Passport Stamps"
+        case .ticketEdge: return "Ticket Edge"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .none: return "circle.dashed"
+        case .simpleLine: return "rectangle"
+        case .doubleLine: return "rectangle.inset.filled"
+        case .rope: return "lasso"
+        case .vine: return "leaf.fill"
+        case .passportStamps: return "stamp.fill"
+        case .ticketEdge: return "ticket.fill"
         }
     }
 }

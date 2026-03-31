@@ -3,7 +3,7 @@ import CoreGraphics
 
 class PackingListPrintView: NSView {
     let trip: TripInstance
-    let watermark: WatermarkStyle
+    let printConfig: AppConfig
     private var pageRects: [CGRect] = []
     private let margin: CGFloat = 36  // 0.5 inch
     private let itemHeight: CGFloat = 16
@@ -16,9 +16,9 @@ class PackingListPrintView: NSView {
     private var printableHeight: CGFloat = 0
     private var columnCount: Int = 3
 
-    init(trip: TripInstance, watermark: WatermarkStyle) {
+    init(trip: TripInstance, printConfig: AppConfig) {
         self.trip = trip
-        self.watermark = watermark
+        self.printConfig = printConfig
         super.init(frame: .zero)
     }
 
@@ -125,8 +125,8 @@ class PackingListPrintView: NSView {
         context.setFillColor(CGColor.white)
         context.fill(dirtyRect)
 
-        // Watermark
-        WatermarkRenderer.draw(style: watermark, in: dirtyRect, context: context)
+        // Watermark layers
+        WatermarkRenderer.draw(config: printConfig, in: dirtyRect, context: context)
 
         let x = margin
         let topY = dirtyRect.maxY - margin
@@ -307,8 +307,8 @@ class PackingListPrintView: NSView {
 
 struct PrintService {
     @MainActor
-    static func print(trip: TripInstance, watermark: WatermarkStyle) {
-        let printView = PackingListPrintView(trip: trip, watermark: watermark)
+    static func print(trip: TripInstance, config: AppConfig) {
+        let printView = PackingListPrintView(trip: trip, printConfig: config)
 
         let printInfo = NSPrintInfo.shared.copy() as! NSPrintInfo
         printInfo.topMargin = 0

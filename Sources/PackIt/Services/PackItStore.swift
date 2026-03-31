@@ -386,8 +386,7 @@ final class PackItStore {
     func printTrip(_ trip: TripInstance) {
         Task {
             let config = (try? await persistence.loadConfig()) ?? AppConfig()
-            let watermark = config.printWithWatermark ? config.watermarkStyle : .none
-            PrintService.print(trip: trip, watermark: watermark)
+            PrintService.print(trip: trip, config: config)
         }
     }
 }

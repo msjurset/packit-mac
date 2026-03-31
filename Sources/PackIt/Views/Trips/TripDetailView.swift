@@ -30,6 +30,10 @@ struct TripDetailView: View {
 
                 packingSection
                     .padding(.horizontal)
+
+                WisdomBanner()
+                    .padding(.horizontal)
+                    .padding(.top, 8)
             }
             .padding(.vertical)
         }
