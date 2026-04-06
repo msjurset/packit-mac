@@ -137,6 +137,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
     case printing
     case exporting
     case reminders
+    case statistics
     case settings
     case shortcuts
 
@@ -155,6 +156,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .printing: return "Printing"
         case .exporting: return "Exporting & Sharing"
         case .reminders: return "Reminders"
+        case .statistics: return "Statistics"
         case .settings: return "Settings"
         case .shortcuts: return "Keyboard Shortcuts"
         }
@@ -173,6 +175,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .printing: return "Print your packing list with watermarks"
         case .exporting: return "Share lists in multiple formats"
         case .reminders: return "Automatic departure and item reminders"
+        case .statistics: return "Trip history and packing insights"
         case .settings: return "Customize print and watermark options"
         case .shortcuts: return "Quick access with keyboard shortcuts"
         }
@@ -191,6 +194,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .printing: return "printer.fill"
         case .exporting: return "square.and.arrow.up.fill"
         case .reminders: return "bell.fill"
+        case .statistics: return "chart.bar.fill"
         case .settings: return "gearshape.fill"
         case .shortcuts: return "keyboard.fill"
         }
@@ -199,18 +203,19 @@ enum HelpTopic: String, CaseIterable, Identifiable {
     var searchKeywords: [String] {
         switch self {
         case .gettingStarted: return ["start", "begin", "overview", "intro", "welcome", "how to"]
-        case .templates: return ["template", "list", "create", "reusable", "blueprint"]
-        case .templateItems: return ["item", "category", "priority", "add", "edit", "delete"]
-        case .contextTags: return ["tag", "filter", "context", "beach", "winter", "fishing"]
+        case .templates: return ["template", "list", "create", "reusable", "blueprint", "duplicate", "copy", "clone"]
+        case .templateItems: return ["item", "category", "priority", "quantity", "add", "edit", "delete", "drag", "drop", "reorder", "move", "sort", "suggest", "auto-fill", "double-click"]
+        case .contextTags: return ["tag", "filter", "context", "beach", "winter", "fishing", "comma", "suggest", "auto-suggest", "tab", "cycling"]
         case .creatingTrips: return ["trip", "vacation", "travel", "departure", "create", "new"]
-        case .packingChecklist: return ["pack", "check", "checkbox", "progress", "color", "category"]
+        case .packingChecklist: return ["pack", "check", "checkbox", "progress", "color", "category", "drag", "reorder", "batch", "all", "check all", "uncheck all"]
         case .todosAndNotes: return ["todo", "task", "note", "inspector", "sidebar"]
         case .merging: return ["merge", "promote", "ad-hoc", "new items", "template"]
         case .printing: return ["print", "watermark", "border", "paper", "pdf"]
-        case .exporting: return ["export", "share", "html", "csv", "packitlist", "airdrop"]
+        case .exporting: return ["export", "share", "html", "csv", "packitlist", "packittemplate", "airdrop", "template"]
         case .reminders: return ["remind", "notification", "alert", "departure", "due date"]
+        case .statistics: return ["statistics", "stats", "history", "dashboard", "insights", "frequency", "most packed", "ad-hoc", "timeline"]
         case .settings: return ["setting", "preference", "config", "watermark", "opacity"]
-        case .shortcuts: return ["keyboard", "shortcut", "hotkey", "key"]
+        case .shortcuts: return ["keyboard", "shortcut", "hotkey", "key", "undo", "redo", "tab", "suggest", "auto-suggest", "double-click", "ctrl-j", "ctrl-k"]
         }
     }
 
@@ -258,6 +263,11 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                 HelpSection(title: "Editing a Template", body: """
                 Right-click a template in the list and choose **Edit** to change its name or tags. From the template detail view, use the **pencil** button in the toolbar to edit, or the **+** button to add items.
                 """),
+                HelpSection(title: "Duplicating a Template", body: """
+                Right-click a template and choose **Duplicate**, or click the **Duplicate** button in the template detail toolbar. This creates a full copy — including all items and tags — named "Template Copy". Edit the copy to customize it for a different trip type.
+                """, tips: [
+                    "Great for creating variants like \"Beach – Domestic\" and \"Beach – International\" from a single base template",
+                ]),
                 HelpSection(title: "Deleting a Template", body: """
                 Right-click a template and choose **Delete**. You'll be asked to confirm since this permanently removes the template and all its items.
                 """),
@@ -266,14 +276,26 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .templateItems:
             return [
                 HelpSection(title: "Adding Items", body: """
-                From the template detail view, click the **+** button. Each item has:
+                From the template detail view, click **Add Item**. Each item has:
 
-                **Name** — What you're packing (e.g., "Sunscreen")
-                **Category** — Groups items visually (e.g., "Toiletries", "Electronics")
+                **Name** — What you're packing (e.g., "Sunscreen"). As you type, PackIt suggests matching items from your other templates and trips. Press **Tab** to cycle through suggestions, **Enter** to accept.
+                **Category** — Groups items visually (e.g., "Toiletries", "Electronics"). Suggests categories you've used before.
                 **Priority** — Low, Medium, High, or Critical. Affects color coding and reminder behavior.
+                **Quantity** — How many to pack (default 1). Shown as "×3" next to the item name when greater than 1.
                 **Notes** — Optional details (e.g., "SPF 50+", "Check expiry date")
-                **Context Tags** — Optional tags for fine-grained filtering when creating trips
-                """),
+                **Context Tags** — Optional tags for fine-grained filtering when creating trips. Type comma-separated tag names or use the suggestion dropdown.
+
+                When you select a suggested item name, PackIt **auto-fills** the category, priority, tags, notes, and quantity from that item — saving you from re-entering details.
+                """, tips: [
+                    "**Double-click** any item in the template detail view to edit it",
+                    "You can **delete** an item from the edit form using the trash button at the bottom",
+                ]),
+                HelpSection(title: "Reordering Items", body: """
+                Drag and drop items to reorder them within a category. Simply click and drag an item onto another item in the same category, and it will be placed before the target. The new order is saved automatically and preserved when creating trips.
+                """, tips: [
+                    "Reordering works in both template detail views and trip packing checklists",
+                    "Items can only be reordered within the same category — drag between categories is ignored",
+                ]),
                 HelpSection(title: "Categories", body: """
                 Categories organize items within a template. They appear as section headers with icons. Use consistent category names across templates for a clean look.
                 """, tips: [
@@ -310,8 +332,24 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                     "Leave everyday items **untagged** so they're always included regardless of trip type",
                     "Use specific tags like \"fly-fishing\" for niche gear that should only appear for specific trips",
                 ]),
+                HelpSection(title: "Adding Tags", body: """
+                You can add tags in several places:
+
+                **Template editor** — The "New tag" field at the bottom of the Context Tags section supports **comma-separated input** (e.g., "beach, summer, tropical") and **auto-suggests** existing tags as you type. Press **Tab** to cycle through suggestions, **Enter** to accept.
+
+                **Item editor** — Same tag input field with auto-suggest and comma-separation.
+
+                **Inline tag editor** — Click the **+** button next to tags in the template detail header to add tags directly.
+
+                **Tag manager** — Go to Tags in the sidebar and add tags from the top input field.
+                """, tips: [
+                    "Use **Tab** and **Shift-Tab** to cycle through suggestions, or **Arrow keys** / **Ctrl-J/K**",
+                    "Press **Escape** to dismiss suggestions without accepting",
+                ]),
                 HelpSection(title: "Managing Tags", body: """
                 Go to **Tags** in the sidebar to see all tags, rename them, or delete unused ones. Renaming a tag updates it across all templates automatically.
+
+                **Deleting a tag** removes it everywhere — from the global tag list, from all template-level tags, and from all item-level tags across every template.
                 """),
             ]
 
@@ -370,6 +408,13 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                 **Teal** — 50-99% packed
                 **Green** — 100% packed
                 """),
+                HelpSection(title: "Batch Pack/Unpack", body: """
+                Click the **circle icon** next to a category header to pack or unpack all items in that category at once. The icon shows a dashed circle when some items are unpacked, and a filled checkmark when all items are packed.
+
+                This is useful for quickly marking entire categories as packed (e.g., all Toiletries) or resetting a category to start over.
+                """, tips: [
+                    "Batch operations are undoable — press **⌘Z** to undo if you accidentally pack/unpack a whole category",
+                ]),
                 HelpSection(title: "Adding Items During a Trip", body: """
                 Click **Add Item** at the top of the packing list. Items added during a trip are marked as **ad-hoc** (purple "new" badge). After the trip, you can merge these back into a template.
                 """),
@@ -384,12 +429,12 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                 **Notes** — Free-form text for the trip
                 **Trip Info** — Quick reference for dates, status, and counts
                 """),
-                HelpSection(title: "TODOs", body: """
-                Type in the **"Add a todo..."** field and press Enter to quickly add a TODO. Click the circle to mark it complete. Right-click to delete.
+                HelpSection(title: "Using the Task List", body: """
+                Type in the **"Add a todo..."** field and press Enter to quickly add a task. Click the circle to mark it complete. Right-click to delete.
 
-                TODOs are separate from packing items. Use them for tasks like "Call hotel for late check-in", "Print boarding passes", or "Buy travel adapter".
+                These tasks are separate from packing items. Use them for things like "Call hotel for late check-in", "Print boarding passes", or "Buy travel adapter".
                 """),
-                HelpSection(title: "Notes", body: """
+                HelpSection(title: "Trip Notes", body: """
                 Click **Edit** to open the notes editor. Notes are free-form text for anything related to the trip: confirmation numbers, restaurant recommendations, packing reminders, or directions.
                 """),
             ]
@@ -437,17 +482,29 @@ enum HelpTopic: String, CaseIterable, Identifiable {
 
         case .exporting:
             return [
-                HelpSection(title: "Export Formats", body: """
+                HelpSection(title: "Exporting Trips", body: """
                 **PackIt File (.packitlist)** — Native format containing the full trip data. Share with other PackIt users via AirDrop, email, or a shared folder. Double-clicking a .packitlist file opens it in PackIt.
 
                 **HTML** — A self-contained web page with checkboxes, styled with the PackIt teal theme. Great for sharing with anyone or printing from a browser.
 
                 **CSV** — Spreadsheet-compatible format with columns for Category, Item, Priority, Packed, and Notes. Open in Excel, Numbers, or Google Sheets.
                 """),
-                HelpSection(title: "Sharing a List", body: """
-                To share a packing list with someone who has PackIt, export as **.packitlist** and send it. They can double-click to import.
+                HelpSection(title: "Exporting Templates", body: """
+                Templates can also be exported and shared. Right-click a template and choose **Export...**, or use the **Export** button in the template detail toolbar.
 
-                For someone without PackIt, use **HTML** (they can open it in any browser) or **CSV** (for spreadsheet editing).
+                **PackIt Template (.packittemplate)** — Native format for sharing templates with other PackIt users. Double-clicking a .packittemplate file imports it into PackIt.
+
+                **HTML** — A printable checklist version of the template with category headers and checkboxes.
+
+                **CSV** — Spreadsheet format with columns for Category, Item, Priority, Notes, and Tags.
+                """, tips: [
+                    "Share your best templates with friends and family so they can use them as a starting point",
+                    "Export as HTML for a quick printable checklist without needing the app",
+                ]),
+                HelpSection(title: "Sharing", body: """
+                To share with someone who has PackIt, export as **.packitlist** (trips) or **.packittemplate** (templates) and send via AirDrop, email, or shared folder. They can double-click to import.
+
+                For someone without PackIt, use **HTML** (opens in any browser) or **CSV** (for spreadsheet editing).
                 """),
             ]
 
@@ -465,6 +522,35 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                 PackIt requests notification permission on first launch. If you denied it, re-enable in:
 
                 **System Settings → Notifications → PackIt**
+                """),
+            ]
+
+        case .statistics:
+            return [
+                HelpSection(title: "Statistics Dashboard", body: """
+                Click **Statistics** in the sidebar to see insights about your trips and packing habits. The dashboard shows data from all your trips — the more trips you take, the more useful the insights become.
+                """),
+                HelpSection(title: "Overview Cards", body: """
+                At-a-glance numbers including:
+
+                **Total Trips** — All trips across all statuses
+                **Items Packed** — Total items checked off across all trips
+                **Completion Rate** — Average packing progress of completed/archived trips
+                **Templates** — How many templates you've built
+                **Avg Items/Trip** — Average number of items per trip
+                **Ad-Hoc Items** — Total items added during trips (not from templates)
+                """),
+                HelpSection(title: "Insights", body: """
+                **Most Packed Items** — Items that appear across the most trips, ranked by frequency. Useful for seeing your packing essentials.
+
+                **Top Categories** — Which categories contain the most items across all trips.
+
+                **Frequently Added Ad-Hoc** — Items you keep adding during trips that aren't in any template. If an item shows up here, consider adding it to a template so you don't forget it next time.
+                """, tips: [
+                    "The ad-hoc insights section only shows items added in 2 or more trips — one-offs are filtered out",
+                ]),
+                HelpSection(title: "Trip Timeline", body: """
+                A chronological view of all your trips showing name, departure date, status, item count, and packing progress. Great for reviewing your travel history.
                 """),
             ]
 
@@ -490,6 +576,8 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                 **⌘N** — New template
                 **⌘⇧N** — New trip
                 **⌘K** — Quick search
+                **⌘Z** — Undo
+                **⌘⇧Z** — Redo
                 **⌘,** — Settings
                 **⌘?** — Help
                 """),
@@ -500,9 +588,21 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                 - **Edit** — Edit trip details
                 - **Inspector toggle** — Show/hide TODOs & Notes sidebar
                 """),
+                HelpSection(title: "Auto-Suggest Fields", body: """
+                Tag and item name fields with auto-suggest support these keys:
+
+                **Tab** — Select first suggestion (or advance to next)
+                **Shift-Tab** — Move to previous suggestion
+                **↓ / Ctrl-J** — Same as Tab (advance)
+                **↑ / Ctrl-K** — Same as Shift-Tab (previous)
+                **Enter** — Accept the current suggestion
+                **Enter** (again) — Submit / commit the value
+                **Escape** — Dismiss suggestions
+                """),
                 HelpSection(title: "Navigation", body: """
                 - **Click sidebar items** to switch between sections
                 - **Click items in the middle column** to view details
+                - **Double-click** a template item to edit it
                 - **Arrow keys** work in lists for keyboard navigation
                 - **Right-click** items for context menus (edit, delete)
                 """),

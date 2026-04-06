@@ -7,69 +7,47 @@ struct TemplateEditorSheet: View {
 
     @State private var name: String = ""
     @State private var selectedTags: Set<String> = []
-    @State private var newTag: String = ""
-
     private var isNew: Bool { template == nil }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Form {
-                Section("Template Details") {
-                    TextField("Name", text: $name)
-                        .textFieldStyle(.roundedBorder)
-                }
+        FormSheet(width: 500, height: 400) {
+            Section("Template Details") {
+                LeadingTextField(label: "Name", text: $name)
+            }
 
-                Section("Context Tags") {
-                    FlowLayout(spacing: 6) {
-                        ForEach(store.allTagNames, id: \.self) { tag in
-                            TagChip(name: tag, isSelected: selectedTags.contains(tag)) {
-                                if selectedTags.contains(tag) {
-                                    selectedTags.remove(tag)
-                                } else {
-                                    selectedTags.insert(tag)
-                                }
+            Section("Context Tags") {
+                FlowLayout(spacing: 6) {
+                    ForEach(store.allTagNames, id: \.self) { tag in
+                        TagChip(name: tag, isSelected: selectedTags.contains(tag)) {
+                            if selectedTags.contains(tag) {
+                                selectedTags.remove(tag)
+                            } else {
+                                selectedTags.insert(tag)
                             }
                         }
                     }
-                    HStack {
-                        TextField("New tag...", text: $newTag)
-                            .textFieldStyle(.roundedBorder)
-                            .onSubmit { addNewTag() }
-                        Button("Add") { addNewTag() }
-                            .disabled(newTag.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                TagSuggestField(selectedTags: selectedTags) { tags in
+                    for tag in tags {
+                        store.addTag(name: tag)
+                        selectedTags.insert(tag)
                     }
                 }
             }
-            .formStyle(.grouped)
-            .padding()
-
-            Divider()
-
-            HStack {
-                Button("Cancel") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Spacer()
-                Button(isNew ? "Create" : "Save") { save() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-            .padding()
+        } footer: {
+            Button("Cancel") { dismiss() }
+                .keyboardShortcut(.cancelAction)
+            Spacer()
+            Button(isNew ? "Create" : "Save") { save() }
+                .keyboardShortcut(.defaultAction)
+                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
         }
-        .frame(width: 500, height: 400)
         .onAppear {
             if let template {
                 name = template.name
                 selectedTags = Set(template.contextTags)
             }
         }
-    }
-
-    private func addNewTag() {
-        let trimmed = newTag.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
-        store.addTag(name: trimmed)
-        selectedTags.insert(trimmed)
-        newTag = ""
     }
 
     private func save() {

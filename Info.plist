@@ -50,6 +50,22 @@
 				<string>com.msjurset.packit.list</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>packittemplate</string>
+			</array>
+			<key>CFBundleTypeName</key>
+			<string>PackIt Template</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.msjurset.packit.template</string>
+			</array>
+		</dict>
 	</array>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
@@ -68,6 +84,24 @@
 				<key>public.filename-extension</key>
 				<array>
 					<string>packitlist</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>PackIt Template</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.msjurset.packit.template</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>packittemplate</string>
 				</array>
 			</dict>
 		</dict>

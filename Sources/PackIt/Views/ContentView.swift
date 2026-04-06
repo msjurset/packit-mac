@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(PackItStore.self) private var store
+    @Environment(\.undoManager) private var undoManager
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var showNewTemplateSheet = false
     @State private var showNewTripSheet = false
@@ -13,15 +14,24 @@ struct ContentView: View {
             SidebarView(selection: $store.navigation)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
         } content: {
-            ContentListView(
-                showNewTemplateSheet: $showNewTemplateSheet,
-                showNewTripSheet: $showNewTripSheet
-            )
+            if store.navigation == .statistics {
+                Color.clear
+                    .navigationSplitViewColumnWidth(min: 0, ideal: 0, max: 0)
+            } else {
+                ContentListView(
+                    showNewTemplateSheet: $showNewTemplateSheet,
+                    showNewTripSheet: $showNewTripSheet
+                )
+            }
         } detail: {
             DetailView()
         }
         .onAppear {
+            store.undoManager = undoManager
             store.loadAll()
+        }
+        .onChange(of: undoManager) { _, newValue in
+            store.undoManager = newValue
         }
         .onChange(of: store.navigation) { oldVal, newVal in
             let oldSection = sidebarSection(oldVal)
@@ -33,11 +43,20 @@ struct ContentView: View {
                 if newSection != "trips" {
                     store.selectedTripID = nil
                 }
+                if newSection != "tags" {
+                    store.selectedTagID = nil
+                }
+                columnVisibility = .all
             }
         }
         .onOpenURL { url in
-            if url.pathExtension == "packitlist" {
+            switch url.pathExtension {
+            case "packitlist":
                 store.importTrip(from: url)
+            case "packittemplate":
+                store.importTemplate(from: url)
+            default:
+                break
             }
         }
         .sheet(isPresented: $showNewTemplateSheet) {
@@ -89,6 +108,7 @@ struct ContentView: View {
         case .templates, .templateDetail: return "templates"
         case .tripsPlanning, .tripsActive, .tripsCompleted, .tripsArchived, .tripDetail: return "trips"
         case .tags: return "tags"
+        case .statistics: return "statistics"
         case .search: return "search"
         case nil: return ""
         }

@@ -76,6 +76,7 @@ struct TripListView: View {
                 }
             }
         }
+        .accessibilityIdentifier("tripList")
         .navigationTitle(title)
         .safeAreaInset(edge: .top) {
             HStack {

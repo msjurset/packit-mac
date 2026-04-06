@@ -1,24 +1,24 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct ExportSheet: View {
+struct TemplateExportSheet: View {
     @Environment(PackItStore.self) private var store
     @Environment(\.dismiss) private var dismiss
-    let trip: TripInstance
+    let template: PackingTemplate
 
-    @State private var exportFormat: ExportFormat = .packitlist
+    @State private var exportFormat: TemplateExportFormat = .packittemplate
     @State private var showFileSaver = false
     @State private var exportData: Data?
     @State private var exportError: String?
 
-    enum ExportFormat: String, CaseIterable {
-        case packitlist = "PackIt File (.packitlist)"
+    enum TemplateExportFormat: String, CaseIterable {
+        case packittemplate = "PackIt Template (.packittemplate)"
         case html = "HTML"
         case csv = "CSV"
 
         var utType: UTType {
             switch self {
-            case .packitlist: return UTType(exportedAs: "com.msjurset.packit.list")
+            case .packittemplate: return UTType(exportedAs: "com.msjurset.packit.template")
             case .html: return .html
             case .csv: return .commaSeparatedText
             }
@@ -26,7 +26,7 @@ struct ExportSheet: View {
 
         var fileExtension: String {
             switch self {
-            case .packitlist: return "packitlist"
+            case .packittemplate: return "packittemplate"
             case .html: return "html"
             case .csv: return "csv"
             }
@@ -38,7 +38,7 @@ struct ExportSheet: View {
             Form {
                 Section("Export Format") {
                     Picker("Format", selection: $exportFormat) {
-                        ForEach(ExportFormat.allCases, id: \.self) { format in
+                        ForEach(TemplateExportFormat.allCases, id: \.self) { format in
                             Text(format.rawValue).tag(format)
                         }
                     }
@@ -46,9 +46,12 @@ struct ExportSheet: View {
                 }
 
                 Section("Preview") {
-                    Text("Trip: \(trip.name)")
-                    Text("Items: \(trip.totalItems) (\(trip.packedCount) packed)")
-                    Text("TODOs: \(trip.todos.count)")
+                    Text("Template: \(template.name)")
+                    Text("Items: \(template.itemCount)")
+                    Text("Categories: \(template.categories.count)")
+                    if !template.contextTags.isEmpty {
+                        Text("Tags: \(template.contextTags.joined(separator: ", "))")
+                    }
                 }
 
                 if let error = exportError {
@@ -72,12 +75,12 @@ struct ExportSheet: View {
             }
             .padding()
         }
-        .frame(width: 450, height: 350)
+        .frame(width: 450, height: 380)
         .fileExporter(
             isPresented: $showFileSaver,
             document: ExportDocument(data: exportData ?? Data()),
             contentType: exportFormat.utType,
-            defaultFilename: "\(trip.name).\(exportFormat.fileExtension)"
+            defaultFilename: "\(template.name).\(exportFormat.fileExtension)"
         ) { result in
             if case .failure(let error) = result {
                 exportError = error.localizedDescription
@@ -91,8 +94,8 @@ struct ExportSheet: View {
         Task {
             do {
                 switch exportFormat {
-                case .packitlist:
-                    exportData = try await store.exportTrip(trip)
+                case .packittemplate:
+                    exportData = try await store.exportTemplate(template)
                 case .html:
                     exportData = generateHTML().data(using: .utf8)
                 case .csv:
@@ -113,71 +116,59 @@ struct ExportSheet: View {
     }
 
     private func generateHTML() -> String {
-        let name = esc(trip.name)
+        let name = esc(template.name)
         var html = """
         <!DOCTYPE html>
         <html><head><meta charset="UTF-8">
-        <title>\(name) - Packing List</title>
+        <title>\(name) - Packing Template</title>
         <style>
         * { box-sizing: border-box; }
         body { font-family: -apple-system, Helvetica Neue, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 24px; color: #2c3e50; line-height: 1.5; }
         h1 { color: #1a7a7a; border-bottom: 3px solid #1a7a7a; padding-bottom: 10px; font-size: 28px; }
         h2 { color: #1a7a7a; margin-top: 28px; font-size: 18px; border-bottom: 1px solid #e0e0e0; padding-bottom: 6px; }
         .meta { color: #7f8c8d; font-size: 14px; margin-bottom: 24px; }
+        .tag { display: inline-block; background: #e8f5f5; color: #1a7a7a; padding: 2px 10px; border-radius: 12px; font-size: 12px; margin-right: 4px; }
         .item { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; }
         .item:hover { background: #f8fafa; }
-        .packed { color: #95a5a6; }
-        .packed span { text-decoration: line-through; }
-        .priority-high span { color: #e67e22; font-weight: 500; }
-        .priority-critical span { color: #e74c3c; font-weight: 600; }
         .checkbox { width: 18px; height: 18px; margin-right: 10px; accent-color: #1a7a7a; }
-        .todo { padding: 6px 12px; display: flex; align-items: center; }
-        .notes { background: #f7f9f9; padding: 16px; border-radius: 8px; margin-top: 16px; border: 1px solid #e8eded; white-space: pre-wrap; }
-        .progress { font-size: 14px; color: #1a7a7a; font-weight: 600; }
+        .priority-high { color: #e67e22; font-weight: 500; }
+        .priority-critical { color: #e74c3c; font-weight: 600; }
+        .notes { font-size: 12px; color: #95a5a6; margin-left: 8px; }
         @media print { body { margin: 20px; font-size: 12px; } .item:hover { background: none; } }
         @media (prefers-color-scheme: dark) {
           body { background: #1a1a2e; color: #e0e0e0; }
           h1, h2 { color: #33b3b3; border-color: #33b3b3; }
           .meta { color: #8899aa; }
+          .tag { background: #1a3a3a; color: #33b3b3; }
           .item { border-color: #2a2a3e; }
           .item:hover { background: #222238; }
-          .packed { color: #667788; }
-          .notes { background: #222238; border-color: #333348; }
-          .progress { color: #33b3b3; }
+          .notes { color: #778899; }
         }
         </style></head><body>
         <h1>\(name)</h1>
-        <div class="meta">
-        Departure: \(trip.departureDate.formatted(date: .long, time: .omitted))
+        <div class="meta">\(template.itemCount) items across \(template.categories.count) categories
         """
-        if let ret = trip.returnDate {
-            html += " &middot; Return: \(ret.formatted(date: .long, time: .omitted))"
-        }
-        html += " &middot; <span class=\"progress\">\(trip.packedCount)/\(trip.totalItems) packed</span></div>"
 
-        let grouped = Dictionary(grouping: trip.items, by: { $0.category ?? "Uncategorized" })
+        if !template.contextTags.isEmpty {
+            html += "<br>"
+            for tag in template.contextTags {
+                html += "<span class=\"tag\">\(esc(tag))</span>"
+            }
+        }
+        html += "</div>"
+
+        let grouped = Dictionary(grouping: template.items, by: { $0.category ?? "Uncategorized" })
         for category in grouped.keys.sorted() {
             html += "<h2>\(esc(category))</h2>"
             for item in grouped[category] ?? [] {
-                let cls = item.isPacked ? "item packed" : "item"
                 let priorityCls = item.priority >= .high ? " priority-\(item.priority.rawValue)" : ""
-                let check = item.isPacked ? "checked" : ""
                 let qty = item.quantity > 1 ? " ×\(item.quantity)" : ""
-                html += "<div class=\"\(cls)\(priorityCls)\"><input type=\"checkbox\" class=\"checkbox\" \(check)><span>\(esc(item.name))\(qty)</span></div>"
+                html += "<div class=\"item\"><input type=\"checkbox\" class=\"checkbox\"><span class=\"\(priorityCls)\">\(esc(item.name))\(qty)</span>"
+                if let notes = item.notes, !notes.isEmpty {
+                    html += "<span class=\"notes\">\(esc(notes))</span>"
+                }
+                html += "</div>"
             }
-        }
-
-        if !trip.todos.isEmpty {
-            html += "<h2>TODOs</h2>"
-            for todo in trip.todos {
-                let check = todo.isComplete ? "checked" : ""
-                let cls = todo.isComplete ? "todo packed" : "todo"
-                html += "<div class=\"\(cls)\"><input type=\"checkbox\" class=\"checkbox\" \(check)> <span>\(esc(todo.text))</span></div>"
-            }
-        }
-
-        if !trip.scratchNotes.isEmpty {
-            html += "<h2>Notes</h2><div class=\"notes\">\(esc(trip.scratchNotes))</div>"
         }
 
         html += "</body></html>"
@@ -185,31 +176,13 @@ struct ExportSheet: View {
     }
 
     private func generateCSV() -> String {
-        var csv = "Category,Item,Quantity,Priority,Packed,Notes\n"
-        for item in trip.items {
+        var csv = "Category,Item,Quantity,Priority,Notes,Tags\n"
+        for item in template.items {
             let cat = item.category ?? ""
-            let packed = item.isPacked ? "Yes" : "No"
             let notes = (item.notes ?? "").replacingOccurrences(of: "\"", with: "\"\"")
-            csv += "\"\(cat)\",\"\(item.name)\",\"\(item.quantity)\",\"\(item.priority.label)\",\"\(packed)\",\"\(notes)\"\n"
+            let tags = item.contextTags.joined(separator: "; ")
+            csv += "\"\(cat)\",\"\(item.name)\",\"\(item.quantity)\",\"\(item.priority.label)\",\"\(notes)\",\"\(tags)\"\n"
         }
         return csv
-    }
-}
-
-struct ExportDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.json, .html, .commaSeparatedText] }
-
-    let data: Data
-
-    init(data: Data) {
-        self.data = data
-    }
-
-    init(configuration: ReadConfiguration) throws {
-        data = configuration.file.regularFileContents ?? Data()
-    }
-
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        FileWrapper(regularFileWithContents: data)
     }
 }

@@ -10,9 +10,7 @@ struct TagManagerView: View {
         List {
             Section {
                 HStack {
-                    TextField("New tag name...", text: $newTagName)
-                        .textFieldStyle(.roundedBorder)
-                        .onSubmit { addTag() }
+                    LeadingTextField(label: "New tag", text: $newTagName, prompt: "New tag name...")
                     Button("Add") { addTag() }
                         .disabled(newTagName.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
@@ -24,15 +22,25 @@ struct TagManagerView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(store.tags) { tag in
-                        HStack {
-                            Image(systemName: "tag")
-                                .foregroundStyle(.blue)
-                            Text(tag.name)
-                            Spacer()
-                            Text(templateCount(for: tag.name))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        Button {
+                            store.selectedTagID = tag.id
+                        } label: {
+                            HStack {
+                                Image(systemName: "tag")
+                                    .foregroundStyle(.blue)
+                                Text(tag.name)
+                                Spacer()
+                                Text(templateCount(for: tag.name))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
+                        .buttonStyle(.plain)
+                        .listRowBackground(
+                            store.selectedTagID == tag.id
+                                ? Color.accentColor.opacity(0.15)
+                                : Color.clear
+                        )
                         .contextMenu {
                             Button("Rename...") {
                                 renamingTag = tag
@@ -47,6 +55,7 @@ struct TagManagerView: View {
                 }
             }
         }
+        .accessibilityIdentifier("tagManager")
         .navigationTitle("Tags")
         .alert("Rename Tag", isPresented: .init(
             get: { renamingTag != nil },
@@ -66,9 +75,10 @@ struct TagManagerView: View {
     }
 
     private func addTag() {
-        let trimmed = newTagName.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
-        store.addTag(name: trimmed)
+        let parts = newTagName.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        for part in parts where !part.isEmpty {
+            store.addTag(name: part)
+        }
         newTagName = ""
     }
 

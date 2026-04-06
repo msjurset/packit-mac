@@ -9,5 +9,6 @@ enum NavigationItem: Hashable {
     case tripsArchived
     case tripDetail(UUID)
     case tags
+    case statistics
     case search
 }

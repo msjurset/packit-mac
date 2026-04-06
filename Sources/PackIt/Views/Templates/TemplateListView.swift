@@ -4,6 +4,7 @@ struct TemplateListView: View {
     @Environment(PackItStore.self) private var store
     @Binding var showNewTemplateSheet: Bool
     @State private var editingTemplate: PackingTemplate?
+    @State private var exportingTemplate: PackingTemplate?
     @State private var templateToDelete: PackingTemplate?
 
     var body: some View {
@@ -44,6 +45,16 @@ struct TemplateListView: View {
                             } label: {
                                 Label("Edit", systemImage: "pencil")
                             }
+                            Button {
+                                store.duplicateTemplate(id: template.id)
+                            } label: {
+                                Label("Duplicate", systemImage: "doc.on.doc")
+                            }
+                            Button {
+                                exportingTemplate = template
+                            } label: {
+                                Label("Export...", systemImage: "square.and.arrow.up")
+                            }
                             Divider()
                             Button(role: .destructive) {
                                 templateToDelete = template
@@ -55,6 +66,7 @@ struct TemplateListView: View {
                 }
             }
         }
+        .accessibilityIdentifier("templateList")
         .navigationTitle("Templates")
         .safeAreaInset(edge: .top) {
             HStack {
@@ -73,6 +85,9 @@ struct TemplateListView: View {
         .searchable(text: $store.searchQuery, prompt: "Search templates...")
         .sheet(item: $editingTemplate) { template in
             TemplateEditorSheet(template: template)
+        }
+        .sheet(item: $exportingTemplate) { template in
+            TemplateExportSheet(template: template)
         }
         .alert("Delete Template?", isPresented: .init(
             get: { templateToDelete != nil },
@@ -107,14 +122,9 @@ struct TemplateRow: View {
                     .foregroundStyle(.secondary)
             }
             if !template.contextTags.isEmpty {
-                HStack(spacing: 3) {
-                    ForEach(template.contextTags.prefix(3), id: \.self) { tag in
+                FlowLayout(spacing: 3) {
+                    ForEach(template.contextTags, id: \.self) { tag in
                         StyledTag(name: tag, compact: true)
-                    }
-                    if template.contextTags.count > 3 {
-                        Text("+\(template.contextTags.count - 3)")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.secondary)
                     }
                 }
             }

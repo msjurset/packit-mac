@@ -32,7 +32,15 @@ clean:
 test:
 	swift test
 
+uitest:
+	xcodegen generate
+	xcodebuild test \
+		-project PackIt.xcodeproj \
+		-scheme PackIt \
+		-only-testing PackItUITests \
+		-destination 'platform=macOS'
+
 seed:
 	swift scripts/seed-templates.swift
 
-.PHONY: build bundle icon deploy clean test seed
+.PHONY: build bundle icon deploy clean test uitest seed

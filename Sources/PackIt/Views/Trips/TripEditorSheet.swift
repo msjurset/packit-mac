@@ -13,44 +13,33 @@ struct TripEditorSheet: View {
     @State private var status: TripStatus = .planning
 
     var body: some View {
-        VStack(spacing: 0) {
-            Form {
-                Section("Trip Details") {
-                    TextField("Name", text: $name)
-                        .textFieldStyle(.roundedBorder)
-                    DatePicker("Departure", selection: $departureDate, displayedComponents: .date)
-                    Toggle("Return Date", isOn: $hasReturnDate)
-                    if hasReturnDate {
-                        DatePicker("Return", selection: $returnDate, displayedComponents: .date)
-                    }
-                    Picker("Status", selection: $status) {
-                        ForEach(TripStatus.allCases, id: \.self) { s in
-                            Label(s.label, systemImage: s.icon).tag(s)
-                        }
+        FormSheet(width: 500, height: 500) {
+            Section("Trip Details") {
+                LeadingTextField(label: "Name", text: $name)
+                DatePicker("Departure", selection: $departureDate, displayedComponents: .date)
+                Toggle("Return Date", isOn: $hasReturnDate)
+                if hasReturnDate {
+                    DatePicker("Return", selection: $returnDate, displayedComponents: .date)
+                }
+                Picker("Status", selection: $status) {
+                    ForEach(TripStatus.allCases, id: \.self) { s in
+                        Label(s.label, systemImage: s.icon).tag(s)
                     }
                 }
-
-                Section("Notes") {
-                    TextEditor(text: $scratchNotes)
-                        .frame(minHeight: 100)
-                }
             }
-            .formStyle(.grouped)
-            .padding()
 
-            Divider()
-
-            HStack {
-                Button("Cancel") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Spacer()
-                Button("Save") { save() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+            Section("Notes") {
+                TextEditor(text: $scratchNotes)
+                    .frame(minHeight: 100)
             }
-            .padding()
+        } footer: {
+            Button("Cancel") { dismiss() }
+                .keyboardShortcut(.cancelAction)
+            Spacer()
+            Button("Save") { save() }
+                .keyboardShortcut(.defaultAction)
+                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
         }
-        .frame(width: 500, height: 500)
         .onAppear {
             name = trip.name
             departureDate = trip.departureDate

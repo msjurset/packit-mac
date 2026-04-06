@@ -3,12 +3,36 @@ import SwiftUI
 // MARK: - Colors
 
 extension Color {
-    static let packitTeal = Color(red: 0.10, green: 0.55, blue: 0.55)
-    static let packitTealLight = Color(red: 0.15, green: 0.65, blue: 0.65)
-    static let packitTealMuted = Color(red: 0.10, green: 0.55, blue: 0.55).opacity(0.12)
-    static let packitAmber = Color(red: 0.90, green: 0.65, blue: 0.20)
-    static let packitGreen = Color(red: 0.30, green: 0.75, blue: 0.45)
-    static let packitRed = Color(red: 0.90, green: 0.30, blue: 0.25)
+    static let packitTeal = Color(nsColor: .init(name: "packitTeal") { appearance in
+        appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
+            ? NSColor(red: 0.20, green: 0.72, blue: 0.72, alpha: 1)
+            : NSColor(red: 0.10, green: 0.55, blue: 0.55, alpha: 1)
+    })
+    static let packitTealLight = Color(nsColor: .init(name: "packitTealLight") { appearance in
+        appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
+            ? NSColor(red: 0.30, green: 0.80, blue: 0.80, alpha: 1)
+            : NSColor(red: 0.15, green: 0.65, blue: 0.65, alpha: 1)
+    })
+    static let packitTealMuted = Color(nsColor: .init(name: "packitTealMuted") { appearance in
+        appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
+            ? NSColor(red: 0.20, green: 0.72, blue: 0.72, alpha: 0.18)
+            : NSColor(red: 0.10, green: 0.55, blue: 0.55, alpha: 0.12)
+    })
+    static let packitAmber = Color(nsColor: .init(name: "packitAmber") { appearance in
+        appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
+            ? NSColor(red: 1.0, green: 0.75, blue: 0.30, alpha: 1)
+            : NSColor(red: 0.90, green: 0.65, blue: 0.20, alpha: 1)
+    })
+    static let packitGreen = Color(nsColor: .init(name: "packitGreen") { appearance in
+        appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
+            ? NSColor(red: 0.40, green: 0.85, blue: 0.55, alpha: 1)
+            : NSColor(red: 0.30, green: 0.75, blue: 0.45, alpha: 1)
+    })
+    static let packitRed = Color(nsColor: .init(name: "packitRed") { appearance in
+        appearance.bestMatch(from: [.darkAqua, .vibrantDark]) != nil
+            ? NSColor(red: 1.0, green: 0.40, blue: 0.35, alpha: 1)
+            : NSColor(red: 0.90, green: 0.30, blue: 0.25, alpha: 1)
+    })
 }
 
 extension ShapeStyle where Self == Color {
@@ -83,6 +107,19 @@ struct StyledTag: View {
     }
 }
 
+// MARK: - Dashed Circle
+
+struct DashedCircle: View {
+    var size: CGFloat = 14
+
+    var body: some View {
+        Circle()
+            .strokeBorder(style: StrokeStyle(lineWidth: 1.2, dash: [3, 4]))
+            .frame(width: size, height: size)
+            .contentShape(Circle())
+    }
+}
+
 // MARK: - Priority Badge
 
 struct PriorityBadge: View {
@@ -92,5 +129,6 @@ struct PriorityBadge: View {
         Image(systemName: priority.icon)
             .font(.caption2)
             .foregroundStyle(Color.priorityColor(priority))
+            .accessibilityLabel("\(priority.label) priority")
     }
 }

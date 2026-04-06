@@ -5,7 +5,10 @@ struct TemplateDetailView: View {
     let template: PackingTemplate
     @State private var showEditSheet = false
     @State private var showAddItemSheet = false
+    @State private var showExportSheet = false
     @State private var editingItem: TemplateItem?
+    @State private var isAddingTag = false
+    @State private var newTagText = ""
 
     var body: some View {
         ScrollView {
@@ -21,13 +24,13 @@ struct TemplateDetailView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    if !template.contextTags.isEmpty {
-                        HStack(spacing: 5) {
-                            ForEach(template.contextTags, id: \.self) { tag in
-                                StyledTag(name: tag)
-                            }
-                        }
-                    }
+                    InlineTagEditor(
+                        tags: template.contextTags,
+                        isAddingTag: $isAddingTag,
+                        newTagText: $newTagText,
+                        onAdd: { tagName in addTagToTemplate(tagName) },
+                        onRemove: { tagName in removeTagFromTemplate(tagName) }
+                    )
 
                     HStack(spacing: 20) {
                         if !template.categories.isEmpty {
@@ -44,6 +47,16 @@ struct TemplateDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.secondary.opacity(0.04))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                // Add item button
+                Button {
+                    showAddItemSheet = true
+                } label: {
+                    Label("Add Item", systemImage: "plus.circle.fill")
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(.packitTeal)
+                }
+                .buttonStyle(.plain)
 
                 // Items by category
                 let grouped = Dictionary(grouping: template.items, by: { $0.category ?? "Uncategorized" })
@@ -65,6 +78,14 @@ struct TemplateDetailView: View {
                         VStack(spacing: 1) {
                             ForEach(grouped[category] ?? []) { item in
                                 TemplateItemRow(item: item)
+                                    .onTapGesture(count: 2) { editingItem = item }
+                                    .draggable(item.id.uuidString)
+                                    .dropDestination(for: String.self) { droppedIDs, _ in
+                                        guard let droppedID = droppedIDs.first,
+                                              let draggedUUID = UUID(uuidString: droppedID) else { return false }
+                                        store.moveTemplateItem(in: template.id, itemID: draggedUUID, before: item.id)
+                                        return true
+                                    }
                                     .contextMenu {
                                         Button {
                                             editingItem = item
@@ -85,13 +106,20 @@ struct TemplateDetailView: View {
             }
             .padding()
         }
+        .accessibilityIdentifier("templateDetail")
         .navigationTitle("Template")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button {
-                    showAddItemSheet = true
+                    store.duplicateTemplate(id: template.id)
                 } label: {
-                    Label("Add Item", systemImage: "plus")
+                    Label("Duplicate", systemImage: "doc.on.doc")
+                }
+
+                Button {
+                    showExportSheet = true
+                } label: {
+                    Label("Export", systemImage: "square.and.arrow.up")
                 }
 
                 Button {
@@ -107,6 +135,9 @@ struct TemplateDetailView: View {
         .sheet(isPresented: $showAddItemSheet) {
             TemplateItemEditorSheet(templateID: template.id, item: nil)
         }
+        .sheet(isPresented: $showExportSheet) {
+            TemplateExportSheet(template: template)
+        }
         .sheet(item: $editingItem) { item in
             TemplateItemEditorSheet(templateID: template.id, item: item)
         }
@@ -116,6 +147,23 @@ struct TemplateDetailView: View {
         guard var updated = store.templates.first(where: { $0.id == template.id }) else { return }
         updated.items.removeAll { $0.id == itemID }
         store.updateTemplate(updated)
+    }
+
+    private func addTagToTemplate(_ tagName: String) {
+        guard var updated = store.templates.first(where: { $0.id == template.id }) else { return }
+        guard !updated.contextTags.contains(tagName) else { return }
+        updated.contextTags.append(tagName)
+        store.updateTemplate(updated, actionName: "Add Tag")
+        // Also register as a global tag if new
+        if !store.tags.contains(where: { $0.name.lowercased() == tagName.lowercased() }) {
+            store.addTag(name: tagName)
+        }
+    }
+
+    private func removeTagFromTemplate(_ tagName: String) {
+        guard var updated = store.templates.first(where: { $0.id == template.id }) else { return }
+        updated.contextTags.removeAll { $0 == tagName }
+        store.updateTemplate(updated, actionName: "Remove Tag")
     }
 }
 
@@ -127,7 +175,14 @@ struct TemplateItemRow: View {
         HStack(spacing: 10) {
             PriorityBadge(priority: item.priority)
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.name)
+                HStack(spacing: 5) {
+                    Text(item.name)
+                    if item.quantity > 1 {
+                        Text("×\(item.quantity)")
+                            .font(.caption.bold().monospacedDigit())
+                            .foregroundStyle(.packitTeal)
+                    }
+                }
                 if let notes = item.notes, !notes.isEmpty {
                     Text(notes)
                         .font(.caption)

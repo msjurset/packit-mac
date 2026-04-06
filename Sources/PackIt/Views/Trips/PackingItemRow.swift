@@ -19,17 +19,24 @@ struct PackingItemRow: View {
                     .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(item.isPacked ? "Unpack \(item.name)" : "Pack \(item.name)")
 
             Image(systemName: item.priority.icon)
                 .font(.caption2)
                 .foregroundStyle(Color.priorityColor(item.priority))
                 .offset(y: -1)
+                .accessibilityLabel("\(item.priority.label) priority")
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(item.name)
                         .strikethrough(item.isPacked)
                         .foregroundStyle(item.isPacked ? .secondary : .primary)
+                    if item.quantity > 1 {
+                        Text("×\(item.quantity)")
+                            .font(.caption2.bold().monospacedDigit())
+                            .foregroundStyle(item.isPacked ? Color.secondary : Color.packitTeal)
+                    }
                     if item.isAdHoc {
                         Text("new")
                             .font(.caption2.weight(.medium))

@@ -34,6 +34,7 @@ struct TripDetailView: View {
             }
             .padding(.vertical)
         }
+        .accessibilityIdentifier("tripDetail")
         .navigationTitle(trip.name)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -149,62 +150,6 @@ struct TripDetailView: View {
         }
     }
 
-    // MARK: - Action Bar
-
-    private var actionBar: some View {
-        HStack(spacing: 6) {
-            Menu {
-                Section("Status") {
-                    statusMenuItems
-                }
-                Section {
-                    if !trip.adHocItems.isEmpty {
-                        Button { activeSheet = .merge } label: {
-                            Label("Merge to Template...", systemImage: "arrow.up.doc")
-                        }
-                    }
-                    Button { activeSheet = .export } label: {
-                        Label("Export...", systemImage: "square.and.arrow.up")
-                    }
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("Actions")
-
-            Button { store.printTrip(trip) } label: {
-                Image(systemName: "printer")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("Print packing list")
-
-            Button { activeSheet = .edit } label: {
-                Image(systemName: "pencil")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help("Edit trip")
-
-            Button { showInspector.toggle() } label: {
-                Image(systemName: "sidebar.trailing")
-                    .font(.title3)
-                    .foregroundStyle(showInspector ? .packitTeal : .secondary)
-            }
-            .buttonStyle(.plain)
-            .help("Toggle TODOs & Notes")
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(.secondary.opacity(0.06))
-        .clipShape(Capsule())
-    }
-
     private var progressColor: Color {
         if trip.progress >= 1.0 { return .packitGreen }
         if trip.progress >= 0.5 { return .packitTeal }
@@ -292,35 +237,62 @@ struct TripDetailView: View {
 // MARK: - Category Section
 
 struct CategorySection: View {
+    @Environment(PackItStore.self) private var store
     let category: String
     let items: [TripItem]
     let tripID: UUID
     var isAlternate: Bool = false
 
     private var packedCount: Int { items.filter(\.isPacked).count }
+    private var allPacked: Bool { !items.isEmpty && packedCount == items.count }
     private let columns = [GridItem(.adaptive(minimum: 280, maximum: .infinity), spacing: 4, alignment: .top)]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        store.setAllPacked(tripID: tripID, category: category, packed: !allPacked)
+                    }
+                } label: {
+                    if allPacked {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.body)
+                            .foregroundStyle(.packitGreen)
+                    } else {
+                        DashedCircle(size: 17)
+                            .foregroundStyle(.secondary.opacity(0.5))
+                    }
+                }
+                .buttonStyle(.plain)
+                .help(allPacked ? "Unpack all in \(category)" : "Pack all in \(category)")
+
                 Image(systemName: CategoryIcon.icon(for: category))
-                    .font(.system(size: 11))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(CategoryIcon.color(for: category))
-                    .frame(width: 15)
+                    .frame(width: 16)
                 Text(category.uppercased())
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.primary.opacity(0.7))
+                    .tracking(0.5)
                 Spacer()
                 Text("\(packedCount)/\(items.count)")
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(packedCount == items.count ? Color.packitGreen : Color.secondary)
             }
-            .padding(.horizontal, 8)
-            .padding(.top, 8)
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
 
             LazyVGrid(columns: columns, spacing: 2) {
                 ForEach(items) { item in
                     PackingItemRow(item: item, tripID: tripID)
+                        .draggable(item.id.uuidString)
+                        .dropDestination(for: String.self) { droppedIDs, _ in
+                            guard let droppedID = droppedIDs.first,
+                                  let draggedUUID = UUID(uuidString: droppedID) else { return false }
+                            store.moveTripItem(in: tripID, itemID: draggedUUID, before: item.id)
+                            return true
+                        }
                 }
             }
             .padding(.horizontal, 4)

@@ -6,11 +6,8 @@ struct SettingsView: View {
     @State private var hasLoaded = false
 
     var body: some View {
-        TabView {
-            printSettingsTab
-                .tabItem { Label("Print", systemImage: "printer") }
-        }
-        .frame(width: 600, height: 580)
+        printSettingsTab
+            .frame(width: 600, height: 580)
         .onAppear { loadConfig() }
     }
 

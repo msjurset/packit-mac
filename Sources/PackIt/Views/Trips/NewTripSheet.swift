@@ -12,81 +12,71 @@ struct NewTripSheet: View {
     @State private var selectedTags: Set<String> = []
 
     var body: some View {
-        VStack(spacing: 0) {
-            Form {
-                Section("Trip Details") {
-                    TextField("Trip Name", text: $name)
-                        .textFieldStyle(.roundedBorder)
-                    DatePicker("Departure", selection: $departureDate, displayedComponents: .date)
-                    Toggle("Return Date", isOn: $hasReturnDate)
-                    if hasReturnDate {
-                        DatePicker("Return", selection: $returnDate, displayedComponents: .date)
-                    }
+        FormSheet(width: 550, height: 600) {
+            Section("Trip Details") {
+                LeadingTextField(label: "Trip Name", text: $name)
+                DatePicker("Departure", selection: $departureDate, displayedComponents: .date)
+                Toggle("Return Date", isOn: $hasReturnDate)
+                if hasReturnDate {
+                    DatePicker("Return", selection: $returnDate, displayedComponents: .date)
                 }
+            }
 
-                Section("Start from Templates") {
-                    if store.templates.isEmpty {
-                        Text("No templates yet. You can add items manually after creating the trip.")
-                            .foregroundStyle(.secondary)
-                            .font(.callout)
-                    } else {
-                        ForEach(store.templates) { template in
-                            Toggle(isOn: Binding(
-                                get: { selectedTemplateIDs.contains(template.id) },
-                                set: { isOn in
-                                    if isOn { selectedTemplateIDs.insert(template.id) }
-                                    else { selectedTemplateIDs.remove(template.id) }
-                                }
-                            )) {
-                                VStack(alignment: .leading) {
-                                    Text(template.name)
-                                    Text("\(template.itemCount) items")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
+            Section("Start from Templates") {
+                if store.templates.isEmpty {
+                    Text("No templates yet. You can add items manually after creating the trip.")
+                        .foregroundStyle(.secondary)
+                        .font(.callout)
+                } else {
+                    ForEach(store.templates) { template in
+                        Toggle(isOn: Binding(
+                            get: { selectedTemplateIDs.contains(template.id) },
+                            set: { isOn in
+                                if isOn { selectedTemplateIDs.insert(template.id) }
+                                else { selectedTemplateIDs.remove(template.id) }
+                            }
+                        )) {
+                            VStack(alignment: .leading) {
+                                Text(template.name)
+                                Text("\(template.itemCount) items")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                             }
                         }
                     }
                 }
+            }
 
-                if !store.allTagNames.isEmpty && !selectedTemplateIDs.isEmpty {
-                    Section("Filter by Context Tags") {
-                        Text("Only include items matching these tags (leave empty for all items).")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        FlowLayout(spacing: 6) {
-                            ForEach(store.allTagNames, id: \.self) { tag in
-                                TagChip(name: tag, isSelected: selectedTags.contains(tag)) {
-                                    if selectedTags.contains(tag) {
-                                        selectedTags.remove(tag)
-                                    } else {
-                                        selectedTags.insert(tag)
-                                    }
+            if !store.allTagNames.isEmpty && !selectedTemplateIDs.isEmpty {
+                Section("Filter by Context Tags") {
+                    Text("Only include items matching these tags (leave empty for all items).")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    FlowLayout(spacing: 6) {
+                        ForEach(store.allTagNames, id: \.self) { tag in
+                            TagChip(name: tag, isSelected: selectedTags.contains(tag)) {
+                                if selectedTags.contains(tag) {
+                                    selectedTags.remove(tag)
+                                } else {
+                                    selectedTags.insert(tag)
                                 }
                             }
                         }
                     }
                 }
             }
-            .formStyle(.grouped)
-            .padding()
-
-            Divider()
-
-            HStack {
-                Button("Cancel") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Spacer()
-                Text(previewText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Button("Create Trip") { createTrip() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-            }
-            .padding()
+        } footer: {
+            Button("Cancel") { dismiss() }
+                .keyboardShortcut(.cancelAction)
+            ContextualHelpButton(topic: .creatingTrips)
+            Spacer()
+            Text(previewText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Button("Create Trip") { createTrip() }
+                .keyboardShortcut(.defaultAction)
+                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
         }
-        .frame(width: 550, height: 600)
     }
 
     private var previewText: String {
