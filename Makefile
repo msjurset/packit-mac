@@ -6,10 +6,12 @@ build:
 	swift build -c release
 
 bundle: build icon
-	@mkdir -p $(BUNDLE)/Contents/MacOS $(BUNDLE)/Contents/Resources
+	@mkdir -p $(BUNDLE)/Contents/MacOS $(BUNDLE)/Contents/Resources $(BUNDLE)/Contents/Frameworks
 	command cp .build/release/PackIt $(BUNDLE)/Contents/MacOS/$(APP_NAME)
+	install_name_tool -add_rpath @loader_path/../Frameworks $(BUNDLE)/Contents/MacOS/$(APP_NAME) 2>/dev/null || true
 	command cp AppIcon.icns $(BUNDLE)/Contents/Resources/AppIcon.icns
 	command cp Info.plist $(BUNDLE)/Contents/Info.plist
+	cp -R .build/arm64-apple-macosx/release/Sparkle.framework $(BUNDLE)/Contents/Frameworks/
 
 icon:
 	@test -f AppIcon.icns || swift scripts/generate-icon.swift
@@ -59,4 +61,8 @@ dmg: bundle
 		"PackIt.dmg" \
 		"$(BUNDLE)"
 
-.PHONY: build bundle icon deploy clean test uitest seed dmg
+release:
+	@test -n "$(VERSION)" || (echo "Usage: make release VERSION=1.0.0" && exit 1)
+	./scripts/release.sh $(VERSION)
+
+.PHONY: build bundle icon deploy clean test uitest seed dmg release

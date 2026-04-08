@@ -312,7 +312,14 @@ class PackingListPrintView: NSView {
 struct PrintService {
     @MainActor
     static func print(trip: TripInstance, config: AppConfig) {
-        let printView = PackingListPrintView(trip: trip, printConfig: config)
+        let printView: NSView = switch config.printLayout {
+        case .standard:
+            PackingListPrintView(trip: trip, printConfig: config)
+        case .compact:
+            CompactPrintView(trip: trip, printConfig: config, measurements: .compact)
+        case .dense:
+            CompactPrintView(trip: trip, printConfig: config, measurements: .dense)
+        }
 
         let printInfo = NSPrintInfo.shared.copy() as! NSPrintInfo
         printInfo.topMargin = 0

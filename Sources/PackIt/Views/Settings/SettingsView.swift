@@ -18,6 +18,11 @@ struct SettingsView: View {
             // Controls
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
+                    // Layout
+                    layoutSection
+
+                    Divider()
+
                     // Pattern
                     patternSection
 
@@ -51,6 +56,33 @@ struct SettingsView: View {
             }
             .padding()
             .frame(minWidth: 240)
+        }
+    }
+
+    // MARK: - Layout Section
+
+    private var layoutSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Print Layout", systemImage: "doc.richtext")
+                .font(.headline)
+
+            Picker("Layout", selection: $config.printLayout) {
+                ForEach(PrintLayout.allCases) { layout in
+                    Label(layout.displayName, systemImage: layout.icon).tag(layout)
+                }
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: config.printLayout) { _, _ in saveConfig() }
+
+            Text({
+                switch config.printLayout {
+                case .standard: "Items in columns with full details, notes, and spacing."
+                case .compact: "Category boxes with smaller text for more items per page."
+                case .dense: "Maximum density — tiny text, more columns, minimal whitespace."
+                }
+            }())
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -173,10 +205,8 @@ struct WatermarkPreview: View {
 
     var body: some View {
         Canvas { context, size in
-            // White page
             context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.white))
 
-            // Render all watermark layers (flip CG context to match bottom-left origin)
             context.withCGContext { cgContext in
                 cgContext.saveGState()
                 cgContext.translateBy(x: 0, y: size.height)
@@ -185,31 +215,83 @@ struct WatermarkPreview: View {
                 cgContext.restoreGState()
             }
 
-            // Simulated text lines (SwiftUI Canvas coordinates: y=0 at top)
-            let textColor = Color.black.opacity(0.5)
-            // Title
-            context.fill(Path(CGRect(x: 20, y: 20, width: 120, height: 10)), with: .color(textColor.opacity(0.3)))
-            // Subtitle
-            context.fill(Path(CGRect(x: 20, y: 36, width: 80, height: 6)), with: .color(textColor.opacity(0.15)))
-            // Category headers + items
-            let cols = 3
-            let colW = (size.width - 50) / CGFloat(cols)
-            for col in 0..<cols {
-                let cx = 20 + CGFloat(col) * colW
-                // Header
-                context.fill(Path(CGRect(x: cx, y: 55, width: colW * 0.6, height: 6)), with: .color(textColor.opacity(0.2)))
-                // Items
-                for i in 0..<6 {
-                    let iy = 70 + CGFloat(i) * 14
-                    guard iy < size.height - 10 else { break }
-                    // Checkbox circle
-                    context.stroke(Path(ellipseIn: CGRect(x: cx, y: iy, width: 6, height: 6)), with: .color(textColor.opacity(0.2)), lineWidth: 0.5)
-                    // Text line
-                    let w = [colW * 0.5, colW * 0.7, colW * 0.4, colW * 0.6, colW * 0.55, colW * 0.45][i]
-                    context.fill(Path(CGRect(x: cx + 10, y: iy + 1, width: w, height: 4)), with: .color(textColor.opacity(0.12)))
-                }
+            switch config.printLayout {
+            case .standard:
+                drawStandardPreview(context: &context, size: size)
+            case .compact:
+                drawBoxPreview(context: &context, size: size, cols: 3, itemH: 10, checkSize: 5, fontSize: 4, boxPad: 5, boxGap: 5, itemsPerBox: [5, 3, 4, 6, 3, 4, 5, 3])
+            case .dense:
+                drawBoxPreview(context: &context, size: size, cols: 5, itemH: 7, checkSize: 3.5, fontSize: 3, boxPad: 3, boxGap: 3, itemsPerBox: [4, 3, 5, 3, 4, 3, 5, 4, 3, 4, 3, 5])
             }
         }
         .frame(minHeight: 200)
+    }
+
+    private func drawStandardPreview(context: inout GraphicsContext, size: CGSize) {
+        let textColor = Color.black.opacity(0.5)
+        context.fill(Path(CGRect(x: 20, y: 20, width: 120, height: 10)), with: .color(textColor.opacity(0.3)))
+        context.fill(Path(CGRect(x: 20, y: 36, width: 80, height: 6)), with: .color(textColor.opacity(0.15)))
+
+        let cols = 3
+        let colW = (size.width - 50) / CGFloat(cols)
+        for col in 0..<cols {
+            let cx = 20 + CGFloat(col) * colW
+            context.fill(Path(CGRect(x: cx, y: 55, width: colW * 0.6, height: 6)), with: .color(textColor.opacity(0.2)))
+            for i in 0..<6 {
+                let iy = 70 + CGFloat(i) * 14
+                guard iy < size.height - 10 else { break }
+                context.stroke(Path(ellipseIn: CGRect(x: cx, y: iy, width: 6, height: 6)), with: .color(textColor.opacity(0.2)), lineWidth: 0.5)
+                let w = [colW * 0.5, colW * 0.7, colW * 0.4, colW * 0.6, colW * 0.55, colW * 0.45][i]
+                context.fill(Path(CGRect(x: cx + 10, y: iy + 1, width: w, height: 4)), with: .color(textColor.opacity(0.12)))
+            }
+        }
+    }
+
+    private func drawBoxPreview(context: inout GraphicsContext, size: CGSize, cols: Int, itemH: CGFloat, checkSize: CGFloat, fontSize: CGFloat, boxPad: CGFloat, boxGap: CGFloat, itemsPerBox: [Int]) {
+        let textColor = Color.black.opacity(0.5)
+        // Smaller header
+        let headerScale: CGFloat = cols >= 5 ? 0.6 : 0.8
+        context.fill(Path(CGRect(x: 14, y: 14, width: 90 * headerScale, height: 8 * headerScale)), with: .color(textColor.opacity(0.3)))
+        context.fill(Path(CGRect(x: 14, y: 14 + 12 * headerScale, width: 55 * headerScale, height: 5 * headerScale)), with: .color(textColor.opacity(0.15)))
+
+        let startY: CGFloat = 14 + 26 * headerScale
+        let margin: CGFloat = cols >= 5 ? 8 : 14
+        let colW = (size.width - margin * 2 - boxGap * CGFloat(cols - 1)) / CGFloat(cols)
+
+        // Place boxes in shortest-column-first order
+        var colHeights = [CGFloat](repeating: startY, count: cols)
+        let boxColor = Color.black.opacity(0.03)
+        let borderColor = Color.black.opacity(0.08)
+        let widths: [CGFloat] = [0.5, 0.7, 0.4, 0.6, 0.55, 0.45, 0.65, 0.5]
+
+        for boxIdx in 0..<itemsPerBox.count {
+            let minCol = colHeights.enumerated().min(by: { $0.element < $1.element })!.offset
+            let bx = margin + CGFloat(minCol) * (colW + boxGap)
+            let by = colHeights[minCol]
+            let items = itemsPerBox[boxIdx]
+            let boxH = boxPad * 2 + 10 + CGFloat(items) * itemH
+
+            guard by + boxH < size.height - 6 else { continue }
+
+            // Box background
+            let boxRect = CGRect(x: bx, y: by, width: colW, height: boxH)
+            let boxPath = Path(roundedRect: boxRect, cornerRadius: 2)
+            context.fill(boxPath, with: .color(boxColor))
+            context.stroke(boxPath, with: .color(borderColor), lineWidth: 0.4)
+
+            // Category header line
+            context.fill(Path(CGRect(x: bx + boxPad, y: by + boxPad, width: colW * 0.5, height: fontSize + 1)), with: .color(textColor.opacity(0.18)))
+
+            // Items
+            let itemStart = by + boxPad + fontSize + 5
+            for i in 0..<items {
+                let iy = itemStart + CGFloat(i) * itemH
+                context.stroke(Path(ellipseIn: CGRect(x: bx + boxPad, y: iy, width: checkSize, height: checkSize)), with: .color(textColor.opacity(0.15)), lineWidth: 0.3)
+                let w = widths[i % widths.count] * (colW - boxPad * 2 - checkSize - 6)
+                context.fill(Path(CGRect(x: bx + boxPad + checkSize + 4, y: iy + 0.5, width: w, height: fontSize)), with: .color(textColor.opacity(0.1)))
+            }
+
+            colHeights[minCol] = by + boxH + boxGap
+        }
     }
 }

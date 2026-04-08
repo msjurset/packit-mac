@@ -5,6 +5,11 @@ options:
     macOS: "15.0"
   xcodeVersion: "16.0"
 
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.7.0
+
 targets:
   PackIt:
     type: application
@@ -22,6 +27,8 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: PackIt
         GENERATE_INFOPLIST_FILE: YES
         ENABLE_APP_SANDBOX: NO
+    dependencies:
+      - package: Sparkle
 
   PackItUITests:
     type: bundle.ui-testing

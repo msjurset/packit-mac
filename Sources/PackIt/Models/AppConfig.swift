@@ -1,6 +1,31 @@
 import Foundation
 
+enum PrintLayout: String, Codable, CaseIterable, Identifiable {
+    case standard
+    case compact
+    case dense
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .standard: return "Standard"
+        case .compact: return "Compact"
+        case .dense: return "Dense"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .standard: return "list.bullet.rectangle"
+        case .compact: return "rectangle.grid.2x2"
+        case .dense: return "square.grid.3x3"
+        }
+    }
+}
+
 struct AppConfig: Codable {
+    var printLayout: PrintLayout = .standard
     var patternStyle: PatternStyle = .palmTrees
     var fullPageStyle: FullPageStyle = .none
     var borderStyle: BorderStyle = .none
