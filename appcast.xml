@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>PackIt</title>
+    <link>https://github.com/msjurset/packit-mac</link>
+    <description>PackIt app updates</description>
+    <language>en</language>
+    <item>
+      <title>Version 1.0.0</title>
+      <sparkle:version>12</sparkle:version>
+      <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <pubDate>Wed, 08 Apr 2026 14:05:15 +0000</pubDate>
+      <enclosure
+        url="https://github.com/msjurset/packit-mac/releases/download/v1.0.0/PackIt-1.0.0.dmg"
+        length="3506710"
+        type="application/octet-stream"
+        sparkle:edSignature="S0K1HNaiJklW6V7IEHvDLq3LkFtW4ferjXtG0At8FjP3gczNmxNO35qj73M9dXWpozHB5HzeDOC6l4qdGcTnDw==" />
+    </item>
+  </channel>
+</rss>

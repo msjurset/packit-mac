@@ -2,42 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/msjurset/packit-mac/main/appcast.xml</string>
-	<key>SUPublicEDKey</key>
-	<string>UEwVMFOzCrec4H3qyVMwgROaxCnPkUbCB4lLz/GnwCg=</string>
-	<key>SUEnableAutomaticChecks</key>
-	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
-	<key>CFBundleExecutable</key>
-	<string>PackIt</string>
-	<key>CFBundleIdentifier</key>
-	<string>com.msjurset.packit-mac</string>
-	<key>CFBundleInfoDictionaryVersion</key>
-	<string>6.0</string>
-	<key>CFBundleName</key>
-	<string>PackIt</string>
 	<key>CFBundleDisplayName</key>
 	<string>PackIt</string>
-	<key>CFBundlePackageType</key>
-	<string>APPL</string>
-	<key>CFBundleShortVersionString</key>
-	<string>1.0.0</string>
-	<key>CFBundleVersion</key>
-	<string>1</string>
-	<key>CFBundleIconFile</key>
-	<string>AppIcon</string>
-	<key>LSMinimumSystemVersion</key>
-	<string>15.0</string>
-	<key>LSApplicationCategoryType</key>
-	<string>public.app-category.travel</string>
-	<key>NSHighResolutionCapable</key>
-	<true/>
-	<key>NSSupportsAutomaticTermination</key>
-	<true/>
-	<key>NSSupportsSuddenTermination</key>
-	<true/>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -73,6 +41,38 @@
 			</array>
 		</dict>
 	</array>
+	<key>CFBundleExecutable</key>
+	<string>PackIt</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.msjurset.packit-mac</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>PackIt</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.0</string>
+	<key>CFBundleVersion</key>
+	<string>12</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.travel</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>15.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSSupportsAutomaticTermination</key>
+	<true/>
+	<key>NSSupportsSuddenTermination</key>
+	<true/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/msjurset/packit-mac/main/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>UEwVMFOzCrec4H3qyVMwgROaxCnPkUbCB4lLz/GnwCg=</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
