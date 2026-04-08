@@ -43,4 +43,20 @@ uitest:
 seed:
 	swift scripts/seed-templates.swift
 
-.PHONY: build bundle icon deploy clean test uitest seed
+dmg: bundle
+	@test -f dmg-background.png || swift scripts/generate-dmg-bg.swift
+	rm -f PackIt.dmg
+	create-dmg \
+		--volname "PackIt" \
+		--background "dmg-background.png" \
+		--window-pos 200 120 \
+		--window-size 660 400 \
+		--icon-size 80 \
+		--icon "$(BUNDLE)" 170 170 \
+		--app-drop-link 490 170 \
+		--hide-extension "$(BUNDLE)" \
+		--no-internet-enable \
+		"PackIt.dmg" \
+		"$(BUNDLE)"
+
+.PHONY: build bundle icon deploy clean test uitest seed dmg
