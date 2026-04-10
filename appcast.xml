@@ -7,15 +7,15 @@
     <language>en</language>
     <item>
       <title>Version 1.0.0</title>
-      <sparkle:version>13</sparkle:version>
+      <sparkle:version>15</sparkle:version>
       <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
-      <pubDate>Thu, 09 Apr 2026 18:39:04 +0000</pubDate>
+      <pubDate>Fri, 10 Apr 2026 19:15:16 +0000</pubDate>
       <enclosure
         url="https://github.com/msjurset/packit-mac/releases/download/v1.0.0/PackIt-1.0.0.dmg"
-        length="4030625"
+        length="4635577"
         type="application/octet-stream"
-        sparkle:edSignature="jhsvUdU2rNs0BfNmSn5A2C/X9pB6U4UoMi1JInDDizwT33uzX2K7OdL98Y6nc0MyeHALWBUcPggfN7jGTGbzDg==" />
+        sparkle:edSignature="SNM50oxT7SZ87ecIG+eeqPGSE6h/onMDAROMu+KhxucOLu0yf8hiRQvgCuhYMZ4PSuUQlRYLOWC3GGFJgEPcCw==" />
     </item>
   </channel>
 </rss>
