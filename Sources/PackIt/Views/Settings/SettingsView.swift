@@ -6,9 +6,190 @@ struct SettingsView: View {
     @State private var hasLoaded = false
 
     var body: some View {
-        printSettingsTab
-            .frame(width: 600, height: 580)
+        TabView {
+            generalTab
+                .tabItem { Label("General", systemImage: "gearshape") }
+            weatherTab
+                .tabItem { Label("Weather", systemImage: "cloud.sun") }
+            printSettingsTab
+                .tabItem { Label("Print", systemImage: "printer") }
+        }
+        .frame(width: 600, height: 580)
         .onAppear { loadConfig() }
+    }
+
+    // MARK: - General Tab
+
+    private var generalTab: some View {
+        @Bindable var store = store
+        return Form {
+            Section("Identity") {
+                HStack {
+                    Text("Your Name")
+                    Spacer()
+                    TextField("e.g. Mark", text: Binding(
+                        get: { store.localConfig.userName },
+                        set: {
+                            store.localConfig.userName = $0
+                            store.localConfig.save()
+                        }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 150)
+                }
+                Text("Shown to others when you edit shared trips and templates.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+
+            Section("Sharing") {
+                HStack {
+                    Text("Shared Folder")
+                    Spacer()
+                    if store.localConfig.hasSharedPath {
+                        Text(store.localConfig.sharedDataPath)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    } else {
+                        Text("Not configured")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    Button("Choose...") {
+                        let panel = NSOpenPanel()
+                        panel.canChooseFiles = false
+                        panel.canChooseDirectories = true
+                        panel.canCreateDirectories = true
+                        panel.message = "Select a synced folder for sharing (Google Drive, Dropbox, iCloud, etc.)"
+                        if panel.runModal() == .OK, let url = panel.url {
+                            store.configureSharedPath(url.path)
+                        }
+                    }
+                    if store.localConfig.hasSharedPath {
+                        Button {
+                            store.configureSharedPath("")
+                        } label: {
+                            Image(systemName: "xmark.circle")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                Text("Select a Google Drive, Dropbox, or iCloud folder. Shared trips and templates will be visible to anyone with access to this folder.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+
+            Section("Appearance") {
+                Picker("Theme", selection: Binding(
+                    get: { store.localConfig.appearance },
+                    set: {
+                        store.localConfig.appearance = $0
+                        store.localConfig.save()
+                    }
+                )) {
+                    ForEach(AppAppearance.allCases, id: \.self) { option in
+                        Text(option.label).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Section("Startup") {
+                Picker("Open on launch", selection: Binding(
+                    get: { store.localConfig.launchView },
+                    set: {
+                        store.localConfig.launchView = $0
+                        store.localConfig.save()
+                    }
+                )) {
+                    ForEach(LaunchView.allCases, id: \.self) { option in
+                        Text(option.label).tag(option)
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    // MARK: - Weather Tab
+
+    private var weatherTab: some View {
+        @Bindable var store = store
+        return Form {
+            Section("Weather Provider") {
+                Picker("Provider", selection: Binding(
+                    get: { store.localConfig.weatherProvider },
+                    set: {
+                        store.localConfig.weatherProvider = $0
+                        store.localConfig.save()
+                    }
+                )) {
+                    ForEach(WeatherProvider.allCases, id: \.self) { provider in
+                        HStack {
+                            Image(systemName: provider.icon)
+                            Text(provider.label)
+                        }
+                        .tag(provider)
+                    }
+                }
+
+                Text(store.localConfig.weatherProvider.forecastDays)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if store.localConfig.weatherProvider == .openMeteo {
+                    Text("When trip dates are beyond forecast range, historical weather from the same dates last year is shown automatically.")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            if store.localConfig.weatherProvider == .weatherApi {
+                Section("WeatherAPI.com") {
+                    HStack {
+                        Text("API Key")
+                        Spacer()
+                        SecureField("Enter API key", text: Binding(
+                            get: { store.localConfig.weatherApiKey },
+                            set: {
+                                store.localConfig.weatherApiKey = $0
+                                store.localConfig.save()
+                            }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 250)
+                    }
+                    Text("Get a free or paid key at weatherapi.com")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            if store.localConfig.weatherProvider == .visualCrossing {
+                Section("Visual Crossing") {
+                    HStack {
+                        Text("API Key")
+                        Spacer()
+                        SecureField("Enter API key", text: Binding(
+                            get: { store.localConfig.visualCrossingApiKey },
+                            set: {
+                                store.localConfig.visualCrossingApiKey = $0
+                                store.localConfig.save()
+                            }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 250)
+                    }
+                    Text("Register for a free key at visualcrossing.com (1000 calls/day)")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+        .formStyle(.grouped)
     }
 
     // MARK: - Print Settings Tab

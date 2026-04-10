@@ -18,19 +18,21 @@ actor Persistence {
     static let shared = Persistence()
 
     let baseURL: URL
-    private let templatesDir: URL
-    private let tripsDir: URL
-    private let tagsFile: URL
-
+    private(set) var sharedURL: URL?
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
+
+    private var localTemplatesDir: URL { baseURL.appendingPathComponent("templates") }
+    private var localTripsDir: URL { baseURL.appendingPathComponent("trips") }
+    private var localTagsFile: URL { baseURL.appendingPathComponent("tags.json") }
+
+    private var sharedTemplatesDir: URL? { sharedURL?.appendingPathComponent("templates") }
+    private var sharedTripsDir: URL? { sharedURL?.appendingPathComponent("trips") }
+    private var sharedTagsFile: URL? { sharedURL?.appendingPathComponent("tags.json") }
 
     init(baseURL: URL? = nil) {
         let base = baseURL ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".packit")
         self.baseURL = base
-        self.templatesDir = base.appendingPathComponent("templates")
-        self.tripsDir = base.appendingPathComponent("trips")
-        self.tagsFile = base.appendingPathComponent("tags.json")
 
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .iso8601
@@ -41,6 +43,17 @@ actor Persistence {
         dec.dateDecodingStrategy = .iso8601
         self.decoder = dec
 
+        ensureDirectories(at: base)
+    }
+
+    func configureSharedPath(_ url: URL?) {
+        self.sharedURL = url
+        if let url {
+            ensureDirectories(at: url)
+        }
+    }
+
+    private nonisolated func ensureDirectories(at base: URL) {
         let fm = FileManager.default
         for dir in [base, base.appendingPathComponent("templates"), base.appendingPathComponent("trips")] {
             if !fm.fileExists(atPath: dir.path) {
@@ -49,46 +62,154 @@ actor Persistence {
         }
     }
 
+    // MARK: - Shared IDs (track which resources live in shared)
+
+    private var sharedTemplateIDs: Set<UUID> = []
+    private var sharedTripIDs: Set<UUID> = []
+
+    func isShared(templateID: UUID) -> Bool { sharedTemplateIDs.contains(templateID) }
+    func isShared(tripID: UUID) -> Bool { sharedTripIDs.contains(tripID) }
+
     // MARK: - Templates
 
     func loadTemplates() throws -> [PackingTemplate] {
-        try loadAll(from: templatesDir)
+        var results: [PackingTemplate] = try loadAll(from: localTemplatesDir)
+        sharedTemplateIDs.removeAll()
+
+        if let sharedDir = sharedTemplatesDir {
+            let shared: [PackingTemplate] = (try? loadAll(from: sharedDir)) ?? []
+            let localIDs = Set(results.map(\.id))
+            for template in shared {
+                sharedTemplateIDs.insert(template.id)
+                if !localIDs.contains(template.id) {
+                    results.append(template)
+                }
+            }
+        }
+        return results
     }
 
     func saveTemplate(_ template: PackingTemplate) throws {
-        try save(template, id: template.id, to: templatesDir)
+        if sharedTemplateIDs.contains(template.id), let dir = sharedTemplatesDir {
+            try save(template, id: template.id, to: dir)
+        } else {
+            try save(template, id: template.id, to: localTemplatesDir)
+        }
     }
 
     func deleteTemplate(id: UUID) throws {
-        try deleteFile(id: id, from: templatesDir)
+        if sharedTemplateIDs.contains(id), let dir = sharedTemplatesDir {
+            try deleteFile(id: id, from: dir)
+            sharedTemplateIDs.remove(id)
+        } else {
+            try deleteFile(id: id, from: localTemplatesDir)
+        }
+    }
+
+    func shareTemplate(id: UUID) throws {
+        guard let sharedDir = sharedTemplatesDir else { return }
+        let localFile = localTemplatesDir.appendingPathComponent("\(id.uuidString).json")
+        let sharedFile = sharedDir.appendingPathComponent("\(id.uuidString).json")
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: localFile.path) else { return }
+        try fm.moveItem(at: localFile, to: sharedFile)
+        sharedTemplateIDs.insert(id)
+    }
+
+    func unshareTemplate(id: UUID) throws {
+        guard let sharedDir = sharedTemplatesDir else { return }
+        let sharedFile = sharedDir.appendingPathComponent("\(id.uuidString).json")
+        let localFile = localTemplatesDir.appendingPathComponent("\(id.uuidString).json")
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: sharedFile.path) else { return }
+        try fm.moveItem(at: sharedFile, to: localFile)
+        sharedTemplateIDs.remove(id)
     }
 
     // MARK: - Trips
 
     func loadTrips() throws -> [TripInstance] {
-        try loadAll(from: tripsDir)
+        var results: [TripInstance] = try loadAll(from: localTripsDir)
+        sharedTripIDs.removeAll()
+
+        if let sharedDir = sharedTripsDir {
+            let shared: [TripInstance] = (try? loadAll(from: sharedDir)) ?? []
+            let localIDs = Set(results.map(\.id))
+            for trip in shared {
+                sharedTripIDs.insert(trip.id)
+                if !localIDs.contains(trip.id) {
+                    results.append(trip)
+                }
+            }
+        }
+        return results
     }
 
     func saveTrip(_ trip: TripInstance) throws {
-        try save(trip, id: trip.id, to: tripsDir)
+        if sharedTripIDs.contains(trip.id), let dir = sharedTripsDir {
+            try save(trip, id: trip.id, to: dir)
+        } else {
+            try save(trip, id: trip.id, to: localTripsDir)
+        }
     }
 
     func deleteTrip(id: UUID) throws {
-        try deleteFile(id: id, from: tripsDir)
+        if sharedTripIDs.contains(id), let dir = sharedTripsDir {
+            try deleteFile(id: id, from: dir)
+            sharedTripIDs.remove(id)
+        } else {
+            try deleteFile(id: id, from: localTripsDir)
+        }
     }
 
-    // MARK: - Tags
+    func shareTrip(id: UUID) throws {
+        guard let sharedDir = sharedTripsDir else { return }
+        let localFile = localTripsDir.appendingPathComponent("\(id.uuidString).json")
+        let sharedFile = sharedDir.appendingPathComponent("\(id.uuidString).json")
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: localFile.path) else { return }
+        try fm.moveItem(at: localFile, to: sharedFile)
+        sharedTripIDs.insert(id)
+    }
+
+    func unshareTrip(id: UUID) throws {
+        guard let sharedDir = sharedTripsDir else { return }
+        let sharedFile = sharedDir.appendingPathComponent("\(id.uuidString).json")
+        let localFile = localTripsDir.appendingPathComponent("\(id.uuidString).json")
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: sharedFile.path) else { return }
+        try fm.moveItem(at: sharedFile, to: localFile)
+        sharedTripIDs.remove(id)
+    }
+
+    // MARK: - Tags (merge local + shared)
 
     func loadTags() throws -> [ContextTag] {
-        let fm = FileManager.default
-        guard fm.fileExists(atPath: tagsFile.path) else { return [] }
-        let data = try Data(contentsOf: tagsFile)
-        return try decoder.decode([ContextTag].self, from: data)
+        var tags = loadTagsFromFile(localTagsFile)
+        if let sharedFile = sharedTagsFile {
+            let sharedTags = loadTagsFromFile(sharedFile)
+            let existingNames = Set(tags.map { $0.name.lowercased() })
+            for tag in sharedTags where !existingNames.contains(tag.name.lowercased()) {
+                tags.append(tag)
+            }
+        }
+        return tags
     }
 
     func saveTags(_ tags: [ContextTag]) throws {
         let data = try encoder.encode(tags)
-        try data.write(to: tagsFile, options: .atomic)
+        try data.write(to: localTagsFile, options: .atomic)
+        // Also update shared tags file if it exists
+        if let sharedFile = sharedTagsFile {
+            try data.write(to: sharedFile, options: .atomic)
+        }
+    }
+
+    private func loadTagsFromFile(_ url: URL) -> [ContextTag] {
+        guard FileManager.default.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url),
+              let tags = try? decoder.decode([ContextTag].self, from: data) else { return [] }
+        return tags
     }
 
     // MARK: - Config
@@ -134,9 +255,10 @@ actor Persistence {
         }
         var results: [T] = []
         for entry in entries where entry.pathExtension == "json" {
-            let data = try Data(contentsOf: entry)
-            let item = try decoder.decode(T.self, from: data)
-            results.append(item)
+            if let data = try? Data(contentsOf: entry),
+               let item = try? decoder.decode(T.self, from: data) {
+                results.append(item)
+            }
         }
         return results
     }

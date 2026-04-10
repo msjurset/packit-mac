@@ -5,21 +5,27 @@ struct NewTripSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
+    @State private var icon: TripIcon = .suitcase
     @State private var departureDate = Date.now
     @State private var returnDate = Date.now.addingTimeInterval(7 * 86400)
     @State private var hasReturnDate = true
+    @State private var destination: TripDestination?
     @State private var selectedTemplateIDs: Set<UUID> = []
     @State private var selectedTags: Set<String> = []
 
     var body: some View {
         FormSheet(width: 550, height: 600) {
             Section("Trip Details") {
-                LeadingTextField(label: "Trip Name", text: $name)
+                HStack(spacing: 12) {
+                    TripIconPicker(selection: $icon)
+                    LeadingTextField(label: "Trip Name", text: $name)
+                }
                 DatePicker("Departure", selection: $departureDate, displayedComponents: .date)
                 Toggle("Return Date", isOn: $hasReturnDate)
                 if hasReturnDate {
                     DatePicker("Return", selection: $returnDate, displayedComponents: .date)
                 }
+                DestinationField(destination: $destination)
             }
 
             Section("Start from Templates") {
@@ -91,6 +97,8 @@ struct NewTripSheet: View {
         guard !trimmed.isEmpty else { return }
         let trip = store.createTrip(
             name: trimmed,
+            icon: icon,
+            destination: destination,
             departureDate: departureDate,
             returnDate: hasReturnDate ? returnDate : nil,
             templateIDs: Array(selectedTemplateIDs),

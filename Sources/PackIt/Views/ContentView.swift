@@ -7,24 +7,18 @@ struct ContentView: View {
     @State private var showNewTemplateSheet = false
     @State private var showNewTripSheet = false
     @State private var showQuickSearch = false
+    @State private var tripListWidth: CGFloat = 280
 
     var body: some View {
         @Bindable var store = store
+        if store.tripDetailFullscreen, let trip = store.selectedTrip {
+            fullscreenTripDetail(trip: trip)
+        } else {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(selection: $store.navigation)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220, max: 300)
-        } content: {
-            if store.navigation == .statistics {
-                Color.clear
-                    .navigationSplitViewColumnWidth(min: 0, ideal: 0, max: 0)
-            } else {
-                ContentListView(
-                    showNewTemplateSheet: $showNewTemplateSheet,
-                    showNewTripSheet: $showNewTripSheet
-                )
-            }
         } detail: {
-            DetailView()
+            detailContent
         }
         .onAppear {
             store.undoManager = undoManager
@@ -42,6 +36,7 @@ struct ContentView: View {
                 }
                 if newSection != "trips" {
                     store.selectedTripID = nil
+                    tripListWidth = 280
                 }
                 if newSection != "tags" {
                     store.selectedTagID = nil
@@ -79,6 +74,27 @@ struct ContentView: View {
         }
         .frame(minWidth: 900, minHeight: 500)
         .overlay(alignment: .top) {
+            // Conflict banner
+            ForEach(store.conflicts) { conflict in
+                HStack(spacing: 8) {
+                    Image(systemName: "person.2.fill")
+                        .foregroundStyle(.orange)
+                    Text("\(conflict.modifiedBy) updated \(conflict.entityName)")
+                        .font(.callout)
+                    Spacer()
+                    Button("OK") { store.dismissConflict(conflict) }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                }
+                .padding(12)
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(radius: 4)
+                .padding(.horizontal)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            .animation(.easeInOut, value: store.conflicts.count)
+
             if let error = store.error {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -100,6 +116,157 @@ struct ContentView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
                 .animation(.easeInOut, value: store.error)
             }
+        }
+        } // end else (not fullscreen)
+    }
+
+    // MARK: - Fullscreen Trip Detail
+
+    @ViewBuilder
+    private func fullscreenTripDetail(trip: TripInstance) -> some View {
+        VStack(spacing: 0) {
+            // Thin toolbar with back button
+            HStack {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        store.tripDetailFullscreen = false
+                    }
+                } label: {
+                    Label("Back to Trip List", systemImage: "chevron.left")
+                        .font(.callout)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.packitTeal)
+                Spacer()
+                Text(trip.name)
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                // Placeholder for symmetry
+                Color.clear.frame(width: 120, height: 1)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(.bar)
+
+            TripDetailView(trip: trip)
+                .environment(store)
+        }
+        .frame(minWidth: 900, minHeight: 500)
+    }
+
+    // MARK: - Detail Content
+
+    @ViewBuilder
+    private var detailContent: some View {
+        switch sidebarSection(store.navigation) {
+        case "templates":
+            HStack(spacing: 0) {
+                TemplateListView(showNewTemplateSheet: $showNewTemplateSheet)
+                    .frame(width: 280)
+                Divider()
+                templateDetail
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        case "trips":
+            HStack(spacing: 0) {
+                tripListForCurrentSection
+                    .frame(width: tripListWidth)
+                    .animation(.easeInOut(duration: 0.2), value: tripListWidth)
+                Divider()
+                tripDetail
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        case "tags":
+            HStack(spacing: 0) {
+                TagManagerView()
+                    .frame(width: 280)
+                Divider()
+                tagDetail
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        case "statistics":
+            StatisticsView()
+                .accessibilityIdentifier("detail.statistics")
+        case "search":
+            HStack(spacing: 0) {
+                SearchView()
+                    .frame(width: 280)
+                Divider()
+                ContentUnavailableView("Search", systemImage: "magnifyingglass", description: Text("Search results appear in the left column."))
+                    .accessibilityIdentifier("detail.search")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        default:
+            ContentUnavailableView("PackIt", systemImage: "suitcase", description: Text("Select a section from the sidebar."))
+                .accessibilityIdentifier("detail.empty")
+        }
+    }
+
+    // MARK: - Trip List
+
+    private func collapseTripList() {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            tripListWidth = 54
+        }
+    }
+
+    private func expandTripList() {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            tripListWidth = 280
+        }
+    }
+
+    @ViewBuilder
+    private var tripListForCurrentSection: some View {
+        switch store.navigation {
+        case .tripsPlanning, .tripDetail:
+            TripListView(trips: store.planningTrips, title: "Planning", showNewTripSheet: $showNewTripSheet, onCollapse: collapseTripList, onExpand: expandTripList)
+        case .tripsActive:
+            TripListView(trips: store.activeTrips, title: "Active Trips", showNewTripSheet: $showNewTripSheet, onCollapse: collapseTripList, onExpand: expandTripList)
+        case .tripsCompleted:
+            TripListView(trips: store.completedTrips, title: "Completed", showNewTripSheet: $showNewTripSheet, onCollapse: collapseTripList, onExpand: expandTripList)
+        case .tripsArchived:
+            TripListView(trips: store.archivedTrips, title: "Archived", showNewTripSheet: $showNewTripSheet, onCollapse: collapseTripList, onExpand: expandTripList)
+        default:
+            EmptyView()
+        }
+    }
+
+    // MARK: - Detail Panes
+
+    @ViewBuilder
+    private var templateDetail: some View {
+        if let template = store.selectedTemplate {
+            TemplateDetailView(template: template)
+                .accessibilityIdentifier("detail.template")
+        } else if store.templates.isEmpty {
+            EmptyView()
+        } else {
+            ContentUnavailableView("No Selection", systemImage: "doc.on.doc", description: Text("Select a template to view its items."))
+                .accessibilityIdentifier("detail.empty.template")
+        }
+    }
+
+    @ViewBuilder
+    private var tripDetail: some View {
+        if let trip = store.selectedTrip {
+            TripDetailView(trip: trip)
+                .accessibilityIdentifier("detail.trip")
+        } else {
+            ContentUnavailableView("No Selection", systemImage: "suitcase", description: Text("Select a trip to view its details."))
+                .accessibilityIdentifier("detail.empty.trip")
+        }
+    }
+
+    @ViewBuilder
+    private var tagDetail: some View {
+        if let tag = store.selectedTag {
+            TagDetailView(tag: tag)
+                .accessibilityIdentifier("detail.tag")
+        } else {
+            ContentUnavailableView("No Selection", systemImage: "tag", description: Text("Select a tag to see its usage."))
+                .accessibilityIdentifier("detail.empty.tag")
         }
     }
 

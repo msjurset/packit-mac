@@ -8,6 +8,7 @@ struct TemplateItemEditorSheet: View {
 
     @State private var name = ""
     @State private var category = ""
+    @State private var owner = ""
     @State private var priority: Priority = .medium
     @State private var quantity = 1
     @State private var notes = ""
@@ -29,6 +30,7 @@ struct TemplateItemEditorSheet: View {
                 ) { accepted in
                     if let source = store.templateItem(named: accepted) {
                         if category.isEmpty, let cat = source.category { category = cat }
+                        if owner.isEmpty, let own = source.owner { owner = own }
                         priority = source.priority
                         selectedTags = Set(source.contextTags)
                         if notes.isEmpty, let n = source.notes { notes = n }
@@ -36,6 +38,7 @@ struct TemplateItemEditorSheet: View {
                     }
                 }
                 CategoryField(text: $category)
+                OwnerField(text: $owner)
                 Picker("Priority", selection: $priority) {
                     ForEach(Priority.allCases, id: \.self) { p in
                         Label(p.label, systemImage: p.icon).tag(p)
@@ -87,6 +90,7 @@ struct TemplateItemEditorSheet: View {
             if let item {
                 name = item.name
                 category = item.category ?? ""
+                owner = item.owner ?? ""
                 priority = item.priority
                 quantity = item.quantity
                 notes = item.notes ?? ""
@@ -104,6 +108,7 @@ struct TemplateItemEditorSheet: View {
             id: item?.id ?? UUID(),
             name: trimmedName,
             category: category.isEmpty ? nil : category,
+            owner: owner.isEmpty ? nil : owner,
             contextTags: Array(selectedTags).sorted(),
             priority: priority,
             notes: notes.isEmpty ? nil : notes,

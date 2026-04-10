@@ -9,6 +9,13 @@ struct TemplateDetailView: View {
     @State private var editingItem: TemplateItem?
     @State private var isAddingTag = false
     @State private var newTagText = ""
+    @State private var showAddPrepTaskSheet = false
+    @State private var editingPrepTask: PrepTaskTemplate?
+    @State private var showAddProcedureSheet = false
+    @State private var editingProcedure: ProcedureTemplate?
+    @State private var showAddRefLink = false
+    @State private var newRefLinkLabel = ""
+    @State private var newRefLinkURL = ""
 
     var body: some View {
         ScrollView {
@@ -19,7 +26,7 @@ struct TemplateDetailView: View {
                         Text(template.name)
                             .font(.title2.bold())
                         Spacer()
-                        Text("\(template.itemCount) items")
+                        Text(templateDetailSummary)
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
@@ -47,6 +54,53 @@ struct TemplateDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(.secondary.opacity(0.04))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                // Linked templates (composite)
+                if !template.linkedTemplateIDs.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Label("Includes Templates", systemImage: "link")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                        }
+                        FlowLayout(spacing: 4) {
+                            ForEach(template.linkedTemplateIDs, id: \.self) { linkedID in
+                                if let linked = store.templates.first(where: { $0.id == linkedID }) {
+                                    HStack(spacing: 4) {
+                                        Text(linked.name)
+                                            .font(.caption)
+                                        Text("\(linked.itemCount)")
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                        Button {
+                                            removeLinkedTemplate(linkedID)
+                                        } label: {
+                                            Image(systemName: "xmark")
+                                                .font(.system(size: 7, weight: .bold))
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(.secondary.opacity(0.08))
+                                    .clipShape(Capsule())
+                                }
+                            }
+                            Menu {
+                                ForEach(store.templates.filter { $0.id != template.id && !template.linkedTemplateIDs.contains($0.id) }) { t in
+                                    Button(t.name) { addLinkedTemplate(t.id) }
+                                }
+                            } label: {
+                                Image(systemName: "plus.circle")
+                                    .font(.caption)
+                                    .foregroundStyle(.packitTeal)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
 
                 // Add item button
                 Button {
@@ -103,6 +157,215 @@ struct TemplateDetailView: View {
                         }
                     }
                 }
+                // Prep Tasks
+                if !template.prepTasks.isEmpty || true {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Label("Prep Tasks", systemImage: "checklist")
+                                .font(.headline)
+                            Spacer()
+                            Button {
+                                showAddPrepTaskSheet = true
+                            } label: {
+                                Label("Add Prep Task", systemImage: "plus.circle.fill")
+                                    .font(.callout.weight(.medium))
+                                    .foregroundStyle(.packitTeal)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        if template.prepTasks.isEmpty {
+                            Text("No prep tasks yet. Add tasks like \"Stop mail\" or \"Set light timers\" that should happen before or after your trip.")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                                .padding(.vertical, 8)
+                        } else {
+                            let grouped = Dictionary(grouping: template.prepTasks, by: \.timing)
+                            FlowLayout(spacing: 8) {
+                                ForEach(PrepTaskTiming.allCases, id: \.self) { timing in
+                                    if let tasks = grouped[timing], !tasks.isEmpty {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Label(timing.label, systemImage: timing.icon)
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(.secondary)
+
+                                            ForEach(tasks) { task in
+                                                HStack(spacing: 6) {
+                                                    if let cat = task.category {
+                                                        Text(cat)
+                                                            .font(.system(size: 9).weight(.medium))
+                                                            .padding(.horizontal, 5)
+                                                            .padding(.vertical, 1)
+                                                            .background(.secondary.opacity(0.08))
+                                                            .clipShape(Capsule())
+                                                    }
+                                                    Text(task.name)
+                                                        .font(.callout)
+                                                }
+                                                .onTapGesture(count: 2) { editingPrepTask = task }
+                                                .contextMenu {
+                                                    Button { editingPrepTask = task } label: {
+                                                        Label("Edit", systemImage: "pencil")
+                                                    }
+                                                    Divider()
+                                                    Button(role: .destructive) { removePrepTask(task.id) } label: {
+                                                        Label("Delete", systemImage: "trash")
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        .padding(10)
+                                        .background(.secondary.opacity(0.04))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.top, 8)
+                }
+
+                // Procedures
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Label("Procedures", systemImage: "list.number")
+                            .font(.headline)
+                        Spacer()
+                        Button {
+                            showAddProcedureSheet = true
+                        } label: {
+                            Label("Add Procedure", systemImage: "plus.circle.fill")
+                                .font(.callout.weight(.medium))
+                                .foregroundStyle(.packitTeal)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if template.procedures.isEmpty {
+                        Text("No procedures yet. Add step-by-step procedures like \"Before Departure\" or \"Site Setup\".")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .padding(.vertical, 8)
+                    } else {
+                        ForEach(template.procedures) { proc in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: proc.phase.icon)
+                                        .font(.caption)
+                                        .foregroundStyle(.packitTeal)
+                                    Text(proc.name)
+                                        .font(.callout.weight(.semibold))
+                                    Text(proc.phase.label)
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                    Spacer()
+                                    Button { editingProcedure = proc } label: {
+                                        Image(systemName: "pencil")
+                                            .font(.caption)
+                                            .foregroundStyle(.packitTeal)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .help("Edit procedure")
+                                    Text("\(proc.stepCount) steps")
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                }
+
+                                ForEach(proc.steps.sorted(by: { $0.sortOrder < $1.sortOrder })) { step in
+                                    HStack(spacing: 6) {
+                                        Text("\(step.sortOrder + 1).")
+                                            .font(.caption2.monospacedDigit())
+                                            .foregroundStyle(.tertiary)
+                                            .frame(width: 18, alignment: .trailing)
+                                        Text(step.text)
+                                            .font(.caption)
+                                        if let notes = step.notes, !notes.isEmpty {
+                                            Text(notes)
+                                                .font(.caption2)
+                                                .foregroundStyle(.tertiary)
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(10)
+                            .background(.secondary.opacity(0.04))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .onTapGesture(count: 2) { editingProcedure = proc }
+                            .contextMenu {
+                                Button { editingProcedure = proc } label: {
+                                    Label("Edit", systemImage: "pencil")
+                                }
+                                Divider()
+                                Button(role: .destructive) { removeProcedure(proc.id) } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.top, 8)
+
+                // Reference Links
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Label("Reference Links", systemImage: "link")
+                            .font(.headline)
+                        Spacer()
+                        Button {
+                            showAddRefLink.toggle()
+                            newRefLinkLabel = ""
+                            newRefLinkURL = ""
+                        } label: {
+                            Label("Add Link", systemImage: "plus.circle.fill")
+                                .font(.callout.weight(.medium))
+                                .foregroundStyle(.packitTeal)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if showAddRefLink {
+                        HStack(spacing: 6) {
+                            TextField("Label", text: $newRefLinkLabel)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 150)
+                            TextField("URL", text: $newRefLinkURL)
+                                .textFieldStyle(.roundedBorder)
+                                .onSubmit { addRefLink() }
+                            Button("Add") { addRefLink() }
+                                .disabled(newRefLinkLabel.isEmpty || newRefLinkURL.isEmpty)
+                        }
+                    }
+
+                    if template.referenceLinks.isEmpty && !showAddRefLink {
+                        Text("Add useful links that should carry through to trips.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    } else {
+                        ForEach(template.referenceLinks) { link in
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.up.right.square")
+                                    .font(.caption2)
+                                    .foregroundStyle(.packitTeal)
+                                Text(link.label)
+                                    .font(.callout)
+                                Text(link.url)
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                                    .lineLimit(1)
+                                Spacer()
+                                Button {
+                                    removeRefLink(link.id)
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+                .padding(.top, 8)
             }
             .padding()
         }
@@ -110,6 +373,17 @@ struct TemplateDetailView: View {
         .navigationTitle("Template")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
+                Menu {
+                    ForEach(store.templates.filter { $0.id != template.id && !template.linkedTemplateIDs.contains($0.id) }) { t in
+                        Button { addLinkedTemplate(t.id) } label: {
+                            Label(t.name, systemImage: "doc.on.doc")
+                        }
+                    }
+                } label: {
+                    Label("Link Template", systemImage: "link.badge.plus")
+                }
+                .help("Include another template's items")
+
                 Button {
                     store.duplicateTemplate(id: template.id)
                 } label: {
@@ -141,6 +415,67 @@ struct TemplateDetailView: View {
         .sheet(item: $editingItem) { item in
             TemplateItemEditorSheet(templateID: template.id, item: item)
         }
+        .sheet(isPresented: $showAddPrepTaskSheet) {
+            PrepTaskEditorSheet(templateID: template.id, task: nil)
+        }
+        .sheet(item: $editingPrepTask) { task in
+            PrepTaskEditorSheet(templateID: template.id, task: task)
+        }
+        .sheet(isPresented: $showAddProcedureSheet) {
+            ProcedureEditorSheet(templateID: template.id, procedure: nil)
+        }
+        .sheet(item: $editingProcedure) { proc in
+            ProcedureEditorSheet(templateID: template.id, procedure: proc)
+        }
+    }
+
+    private var templateDetailSummary: String {
+        var parts: [String] = []
+        if template.itemCount > 0 { parts.append("\(template.itemCount) items") }
+        if template.prepTaskCount > 0 { parts.append("\(template.prepTaskCount) prep tasks") }
+        if !template.procedures.isEmpty { parts.append("\(template.procedures.count) procedures") }
+        return parts.isEmpty ? "Empty" : parts.joined(separator: " · ")
+    }
+
+    private func addLinkedTemplate(_ linkedID: UUID) {
+        guard var updated = store.templates.first(where: { $0.id == template.id }) else { return }
+        guard !updated.linkedTemplateIDs.contains(linkedID) else { return }
+        updated.linkedTemplateIDs.append(linkedID)
+        store.updateTemplate(updated)
+    }
+
+    private func removeLinkedTemplate(_ linkedID: UUID) {
+        guard var updated = store.templates.first(where: { $0.id == template.id }) else { return }
+        updated.linkedTemplateIDs.removeAll { $0 == linkedID }
+        store.updateTemplate(updated)
+    }
+
+    private func addRefLink() {
+        guard !newRefLinkLabel.isEmpty, !newRefLinkURL.isEmpty else { return }
+        guard var updated = store.templates.first(where: { $0.id == template.id }) else { return }
+        var url = newRefLinkURL
+        if !url.contains("://") { url = "https://" + url }
+        updated.referenceLinks.append(ReferenceLink(label: newRefLinkLabel, url: url))
+        store.updateTemplate(updated)
+        showAddRefLink = false
+    }
+
+    private func removeRefLink(_ linkID: UUID) {
+        guard var updated = store.templates.first(where: { $0.id == template.id }) else { return }
+        updated.referenceLinks.removeAll { $0.id == linkID }
+        store.updateTemplate(updated)
+    }
+
+    private func removeProcedure(_ procID: UUID) {
+        guard var updated = store.templates.first(where: { $0.id == template.id }) else { return }
+        updated.procedures.removeAll { $0.id == procID }
+        store.updateTemplate(updated)
+    }
+
+    private func removePrepTask(_ taskID: UUID) {
+        guard var updated = store.templates.first(where: { $0.id == template.id }) else { return }
+        updated.prepTasks.removeAll { $0.id == taskID }
+        store.updateTemplate(updated)
     }
 
     private func removeItem(_ itemID: UUID) {
@@ -181,6 +516,15 @@ struct TemplateItemRow: View {
                         Text("×\(item.quantity)")
                             .font(.caption.bold().monospacedDigit())
                             .foregroundStyle(.packitTeal)
+                    }
+                    if let owner = item.owner, !owner.isEmpty {
+                        Text(owner)
+                            .font(.caption2.weight(.medium))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(.indigo.opacity(0.12))
+                            .foregroundStyle(.indigo)
+                            .clipShape(Capsule())
                     }
                 }
                 if let notes = item.notes, !notes.isEmpty {

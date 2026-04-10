@@ -1,11 +1,16 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct TripListView: View {
     @Environment(PackItStore.self) private var store
     let trips: [TripInstance]
     let title: String
     @Binding var showNewTripSheet: Bool
+    var onCollapse: (() -> Void)?
+    var onExpand: (() -> Void)?
     @State private var tripToDelete: TripInstance?
+    @State private var showImporter = false
+    @State private var exportingTrip: TripInstance?
 
     var body: some View {
         @Bindable var store = store
@@ -22,75 +27,154 @@ struct TripListView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(.packitTeal)
                 }
-            } else {
-                List {
-                    ForEach(trips) { trip in
-                        Button {
-                            store.selectedTripID = trip.id
-                            store.navigation = .tripDetail(trip.id)
-                        } label: {
-                            TripRow(trip: trip)
+            } else if store.tripListCompact {
+                // Compact: ScrollView for full layout control
+                ScrollView {
+                    VStack(spacing: 4) {
+                        ForEach(trips) { trip in
+                            TripIconView(icon: trip.icon, size: 28, showBackground: true)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 7)
+                                        .strokeBorder(store.selectedTripID == trip.id ? trip.icon.color : .clear, lineWidth: 2)
+                                )
+                                .help(trip.name)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 4)
+                                .background(
+                                    store.selectedTripID == trip.id
+                                        ? Color.accentColor.opacity(0.15)
+                                        : Color.clear
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .onTapGesture {
+                                    if store.selectedTripID == trip.id {
+                                        onExpand?()
+                                        store.tripListCompact = false
+                                    } else {
+                                        store.selectedTripID = trip.id
+                                        store.navigation = .tripDetail(trip.id)
+                                    }
+                                }
                         }
-                        .buttonStyle(.plain)
-                        .listRowBackground(
-                            store.selectedTripID == trip.id
-                                ? Color.accentColor.opacity(0.15)
-                                : Color.clear
-                        )
-                        .contextMenu {
-                                if trip.status == .planning {
-                                    Button {
-                                        var updated = trip
-                                        updated.status = .active
-                                        store.updateTrip(updated)
-                                    } label: {
-                                        Label("Start Packing", systemImage: "suitcase.fill")
+                    }
+                    .padding(.horizontal, 2)
+                }
+            } else {
+                // Expanded: ScrollView for full click control
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(trips) { trip in
+                            TripRow(trip: trip)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 2)
+                                .background(
+                                    store.selectedTripID == trip.id
+                                        ? Color.accentColor.opacity(0.15)
+                                        : Color.primary.opacity(0.001)
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .onTapGesture {
+                                    if store.selectedTripID == trip.id {
+                                        onCollapse?()
+                                        store.tripListCompact = true
+                                    } else {
+                                        store.selectedTripID = trip.id
+                                        store.navigation = .tripDetail(trip.id)
                                     }
                                 }
-                                if trip.status == .active {
+                                .contextMenu {
+                                    if trip.status == .planning {
+                                        Button {
+                                            var updated = trip
+                                            updated.status = .active
+                                            store.updateTrip(updated)
+                                        } label: {
+                                            Label("Start Packing", systemImage: "suitcase.fill")
+                                        }
+                                    }
+                                    if trip.status == .active {
+                                        Button {
+                                            var updated = trip
+                                            updated.status = .completed
+                                            store.updateTrip(updated)
+                                        } label: {
+                                            Label("Mark Completed", systemImage: "checkmark.circle")
+                                        }
+                                    }
+                                    if trip.status != .archived {
+                                        Button {
+                                            var updated = trip
+                                            updated.status = .archived
+                                            store.updateTrip(updated)
+                                        } label: {
+                                            Label("Archive", systemImage: "archivebox")
+                                        }
+                                    }
                                     Button {
-                                        var updated = trip
-                                        updated.status = .completed
-                                        store.updateTrip(updated)
+                                        exportingTrip = trip
                                     } label: {
-                                        Label("Mark Completed", systemImage: "checkmark.circle")
+                                        Label("Export...", systemImage: "square.and.arrow.up")
+                                    }
+                                    Divider()
+                                    Divider()
+                                    shareTripMenu(trip)
+                                    Button(role: .destructive) {
+                                        tripToDelete = trip
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
                                     }
                                 }
-                                if trip.status != .archived {
-                                    Button {
-                                        var updated = trip
-                                        updated.status = .archived
-                                        store.updateTrip(updated)
-                                    } label: {
-                                        Label("Archive", systemImage: "archivebox")
-                                    }
-                                }
-                                Divider()
-                                Button(role: .destructive) {
-                                    tripToDelete = trip
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+                .contextMenu {
+                    Button { showNewTripSheet = true } label: {
+                        Label("New Trip", systemImage: "plus")
+                    }
+                    Button { showImporter = true } label: {
+                        Label("Import Trip...", systemImage: "square.and.arrow.down")
                     }
                 }
             }
         }
         .accessibilityIdentifier("tripList")
         .navigationTitle(title)
-        .safeAreaInset(edge: .top) {
-            HStack {
-                Spacer()
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if store.tripListCompact {
                 Button { showNewTripSheet = true } label: {
                     Image(systemName: "plus.circle.fill")
-                        .font(.title2)
+                        .font(.caption)
                         .foregroundStyle(.packitTeal)
                 }
                 .buttonStyle(.plain)
                 .help("New trip (⌘⇧N)")
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+            } else {
+                HStack {
+                    Spacer()
+                    Button { showImporter = true } label: {
+                        Label("Import", systemImage: "square.and.arrow.down")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("Import trip file")
+                    Button { showNewTripSheet = true } label: {
+                        Label("Add Trip", systemImage: "plus.circle")
+                            .font(.caption)
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.packitTeal)
+                    .help("New trip (⌘⇧N)")
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 2)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
         }
         .alert("Delete Trip?", isPresented: .init(
             get: { tripToDelete != nil },
@@ -108,6 +192,31 @@ struct TripListView: View {
                 Text("This will permanently delete \"\(trip.name)\" and all its items.")
             }
         }
+        .fileImporter(isPresented: $showImporter, allowedContentTypes: [UTType(exportedAs: "com.msjurset.packit.list"), .json], allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result {
+                for url in urls {
+                    store.importTrip(from: url)
+                }
+            }
+        }
+        .sheet(item: $exportingTrip) { trip in
+            ExportSheet(trip: trip)
+        }
+    }
+
+    @ViewBuilder
+    private func shareTripMenu(_ trip: TripInstance) -> some View {
+        if store.localConfig.hasSharedPath {
+            if store._sharedTripIDs.contains(trip.id) {
+                Button { store.unshareTrip(id: trip.id) } label: {
+                    Label("Unshare", systemImage: "person.crop.circle.badge.minus")
+                }
+            } else {
+                Button { store.shareTrip(id: trip.id) } label: {
+                    Label("Share", systemImage: "person.crop.circle.badge.plus")
+                }
+            }
+        }
     }
 }
 
@@ -116,7 +225,8 @@ struct TripRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
+            HStack(spacing: 8) {
+                TripIconView(icon: trip.icon, size: 26)
                 Text(trip.name)
                     .font(.headline)
                 Spacer()
@@ -151,5 +261,35 @@ struct TripRow: View {
         if trip.progress >= 1.0 { return .packitGreen }
         if trip.progress >= 0.5 { return .packitTeal }
         return .orange
+    }
+}
+
+struct ResponsiveTripRow: View {
+    let trip: TripInstance
+    let isSelected: Bool
+
+    var body: some View {
+        GeometryReader { geo in
+            if geo.size.width < 200 {
+                // Icon-only mode — tight, centered
+                HStack {
+                    Spacer(minLength: 0)
+                    TripIconView(icon: trip.icon, size: 28, showBackground: true)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 7)
+                                .strokeBorder(isSelected ? trip.icon.color : .clear, lineWidth: 2)
+                        )
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .help(trip.name)
+            } else {
+                TripRow(trip: trip)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+        }
+        .frame(minHeight: 40)
     }
 }

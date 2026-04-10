@@ -140,6 +140,12 @@ enum HelpTopic: String, CaseIterable, Identifiable {
     case statistics
     case settings
     case shortcuts
+    case prepTasks
+    case procedures
+    case mealPlanning
+    case weather
+    case sharing
+    case compositeTemplates
 
     var id: String { rawValue }
 
@@ -159,6 +165,12 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .statistics: return "Statistics"
         case .settings: return "Settings"
         case .shortcuts: return "Keyboard Shortcuts"
+        case .prepTasks: return "Prep Tasks"
+        case .procedures: return "Procedures"
+        case .mealPlanning: return "Meal Planning"
+        case .weather: return "Weather"
+        case .sharing: return "Sharing"
+        case .compositeTemplates: return "Composite Templates"
         }
     }
 
@@ -178,6 +190,12 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .statistics: return "Trip history and packing insights"
         case .settings: return "Customize print and watermark options"
         case .shortcuts: return "Quick access with keyboard shortcuts"
+        case .prepTasks: return "Preparation tasks with 6-tier timing system"
+        case .procedures: return "Step-by-step workflow checklists"
+        case .mealPlanning: return "Day-by-day meal grid"
+        case .weather: return "Trip weather forecast widget"
+        case .sharing: return "Selective sharing via shared folders"
+        case .compositeTemplates: return "Templates that link other templates"
         }
     }
 
@@ -197,6 +215,12 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .statistics: return "chart.bar.fill"
         case .settings: return "gearshape.fill"
         case .shortcuts: return "keyboard.fill"
+        case .prepTasks: return "clock.badge.checkmark.fill"
+        case .procedures: return "list.number"
+        case .mealPlanning: return "fork.knife"
+        case .weather: return "cloud.sun.fill"
+        case .sharing: return "folder.badge.person.crop"
+        case .compositeTemplates: return "square.stack.3d.up.fill"
         }
     }
 
@@ -216,6 +240,12 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .statistics: return ["statistics", "stats", "history", "dashboard", "insights", "frequency", "most packed", "ad-hoc", "timeline"]
         case .settings: return ["setting", "preference", "config", "watermark", "opacity"]
         case .shortcuts: return ["keyboard", "shortcut", "hotkey", "key", "undo", "redo", "tab", "suggest", "auto-suggest", "double-click", "ctrl-j", "ctrl-k"]
+        case .prepTasks: return ["prep", "preparation", "task", "timing", "tier", "before trip", "advance", "week", "month", "day of", "schedule"]
+        case .procedures: return ["procedure", "workflow", "checklist", "step", "process", "routine", "sequence", "protocol"]
+        case .mealPlanning: return ["meal", "food", "breakfast", "lunch", "dinner", "snack", "grocery", "cooking", "diet", "grid", "day"]
+        case .weather: return ["weather", "forecast", "temperature", "rain", "sun", "wind", "climate", "conditions"]
+        case .sharing: return ["share", "shared folder", "collaborate", "family", "group", "selective", "permission", "sync"]
+        case .compositeTemplates: return ["composite", "link", "combine", "nested", "parent", "child", "reference", "reuse", "modular"]
         }
     }
 
@@ -605,6 +635,156 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                 - **Double-click** a template item to edit it
                 - **Arrow keys** work in lists for keyboard navigation
                 - **Right-click** items for context menus (edit, delete)
+                """),
+            ]
+
+        case .prepTasks:
+            return [
+                HelpSection(title: "What Are Prep Tasks?", body: """
+                Prep tasks are time-sensitive preparation items tied to your trip. Unlike packing items that you check off as you load your bag, prep tasks are things you need to do **before** the trip — organized by how far in advance they should be completed.
+                """),
+                HelpSection(title: "The 6-Tier Timing System", body: """
+                Each prep task is assigned to one of six timing tiers:
+
+                **1 Month+** — Long-lead items: renew passport, book accommodations, request time off, schedule pet sitter
+                **2 Weeks** — Medium-lead items: buy travel insurance, start laundry rotation, order specialty gear
+                **1 Week** — Short-lead items: check weather forecast, confirm reservations, charge devices
+                **3 Days** — Final prep: wash clothes, download offline maps, print documents
+                **Day Before** — Last-minute: pack bags, set out-of-office, water plants
+                **Day Of** — Departure tasks: lock up house, take out trash, grab snacks for the road
+
+                Tasks are displayed grouped by tier with a countdown badge showing how many days remain until each tier's deadline.
+                """, tips: [
+                    "Tasks in overdue tiers are highlighted in red so nothing slips through the cracks",
+                    "You can add prep tasks to templates so they carry over to every trip created from that template",
+                ]),
+                HelpSection(title: "Managing Prep Tasks", body: """
+                Open the **Prep Tasks** tab in the trip detail view to see all tasks grouped by tier. Click the **+** button to add a new task, choosing the appropriate timing tier. Check tasks off as you complete them — the progress ring tracks prep completion separately from packing progress.
+                """),
+            ]
+
+        case .procedures:
+            return [
+                HelpSection(title: "What Are Procedures?", body: """
+                Procedures are ordered, step-by-step checklists for repeatable workflows. While packing items are things you bring and prep tasks are things you do before the trip, procedures are **sequences** you follow in a specific order — like a pilot's pre-flight checklist.
+                """, tips: [
+                    "Common procedures: airport security routine, campsite setup, RV winterization, boat launch sequence",
+                    "Procedures are reusable — define them once in a template and they appear in every trip created from it",
+                ]),
+                HelpSection(title: "Creating a Procedure", body: """
+                From a template or trip, open the **Procedures** tab and click **Add Procedure**. Give it a name (e.g., "Campsite Setup"), then add steps in order:
+
+                1. Each step has a **title** and optional **notes** with extra detail
+                2. Steps are numbered automatically and must be completed in sequence
+                3. Drag steps to reorder them if your workflow changes
+
+                When you run a procedure during a trip, each step unlocks only after the previous one is checked off, keeping you on track.
+                """),
+                HelpSection(title: "Using Procedures on a Trip", body: """
+                During a trip, open the **Procedures** tab to see all available procedures. Tap a procedure to start working through it. Steps are presented one at a time with the current step highlighted. Check off each step as you complete it to advance to the next.
+
+                Completed procedures show a green checkmark. You can reset a procedure to run through it again if needed (e.g., repeating a campsite teardown on a multi-stop trip).
+                """),
+            ]
+
+        case .mealPlanning:
+            return [
+                HelpSection(title: "The Meal Grid", body: """
+                The meal planner provides a day-by-day grid for planning meals across your trip. Each row is a day (derived from your departure and return dates), and columns represent meal slots: **Breakfast**, **Lunch**, **Dinner**, and **Snacks**.
+
+                Click any cell to type a meal name or short description. The grid scrolls horizontally on shorter trips and vertically on longer ones.
+                """, tips: [
+                    "Meal planning is especially useful for camping, road trips, and group travel where food logistics matter",
+                    "Leave cells blank for meals you plan to eat out — only fill in what you need to prepare or pack",
+                ]),
+                HelpSection(title: "Grocery Integration", body: """
+                Once your meals are planned, click **Generate Grocery List** to extract a consolidated shopping list from your meal entries. PackIt groups ingredients by category (produce, dairy, pantry, etc.) and deduplicates across days. The grocery list is added as a special category in your trip's packing checklist so you can check items off as you shop.
+                """, tips: [
+                    "Add ingredient notes to meal cells (e.g., \"Tacos — ground beef, tortillas, salsa\") for better grocery list generation",
+                ]),
+                HelpSection(title: "Meal Templates", body: """
+                Save a meal plan as a **meal template** to reuse it on future trips. This is handy if you have go-to meal rotations for camping weekends or family road trips. When creating a new trip, you can apply a meal template and then tweak individual days as needed.
+                """),
+            ]
+
+        case .weather:
+            return [
+                HelpSection(title: "Weather Forecast Widget", body: """
+                The weather widget appears in the trip detail view when your trip has a destination set. It shows a multi-day forecast covering your trip dates, including:
+
+                **Temperature** — Daily high and low
+                **Conditions** — Sun, clouds, rain, snow, etc. with matching SF Symbol icons
+                **Precipitation** — Chance of rain or snow as a percentage
+                **Wind** — Speed and direction
+                """),
+                HelpSection(title: "Packing Recommendations", body: """
+                Based on the forecast, PackIt surfaces **weather-aware suggestions** at the top of the widget:
+
+                - Rain in the forecast? A reminder to pack an umbrella and rain jacket
+                - Cold temperatures? A note about layering and warm accessories
+                - Extreme heat? Suggestions for sun protection and hydration gear
+
+                These recommendations cross-reference your current packing list — if you already have "Umbrella" packed, the rain suggestion won't appear.
+                """, tips: [
+                    "Weather data refreshes automatically when you open the trip, or pull to refresh manually",
+                    "Forecasts are most accurate within 10 days of your departure date",
+                ]),
+                HelpSection(title: "Setting a Destination", body: """
+                Add a destination when creating or editing a trip. Type a city name or address and PackIt geocodes it for the weather lookup. The destination also appears in your trip header and printed packing lists.
+                """),
+            ]
+
+        case .sharing:
+            return [
+                HelpSection(title: "Selective Sharing", body: """
+                PackIt's sharing system lets you share specific templates and trips with other people through **shared folders**. Unlike a full export, shared items stay linked — updates you make are reflected for everyone with access.
+                """),
+                HelpSection(title: "Shared Folders", body: """
+                A shared folder is a location on disk (local folder, iCloud Drive, Dropbox, or any cloud-synced directory) where PackIt reads and writes shared data. To set one up:
+
+                1. Go to **Settings → Sharing**
+                2. Click **Add Shared Folder** and select a directory
+                3. Give the folder a name (e.g., "Family Travel", "Work Team")
+
+                Anyone who adds the same folder in their copy of PackIt will see the shared templates and trips.
+                """, tips: [
+                    "Use a shared iCloud Drive folder for seamless family sharing without any extra setup",
+                    "You can configure multiple shared folders for different groups (family, friends, work)",
+                ]),
+                HelpSection(title: "Choosing What to Share", body: """
+                Sharing is selective — nothing is shared by default. To share a template or trip:
+
+                1. Right-click the item and choose **Share → [Folder Name]**
+                2. Or use the **Share** button in the detail toolbar
+
+                Shared items display a **person badge** in the sidebar list. You can unshare at any time by right-clicking and choosing **Stop Sharing**. Unsharing removes the item from the shared folder but keeps your local copy intact.
+                """),
+            ]
+
+        case .compositeTemplates:
+            return [
+                HelpSection(title: "What Are Composite Templates?", body: """
+                A composite template is a template that **links to other templates** rather than containing its own items directly. Think of it as a meta-template or a playlist of templates. When you create a trip from a composite template, PackIt gathers items from all linked templates, applying tag filters and deduplication as usual.
+                """, tips: [
+                    "Use composites to build trip profiles like \"International Beach Vacation\" that pulls from Clothing, Toiletries, Electronics, Documents, and Beach Gear templates",
+                    "Linked templates stay independent — editing a linked template automatically updates every composite that references it",
+                ]),
+                HelpSection(title: "Creating a Composite Template", body: """
+                1. Click **+** to create a new template
+                2. Toggle **Composite** mode in the template editor
+                3. Use the **Link Templates** section to search and add existing templates
+                4. Optionally set **default context tags** that will be pre-selected when creating a trip from this composite
+
+                The composite's detail view shows a summary of all linked templates with item counts and tag coverage, rather than a flat item list.
+                """),
+                HelpSection(title: "Composites vs. Multi-Select", body: """
+                You can already select multiple templates when creating a trip — so why use composites?
+
+                **Saved combinations** — A composite remembers which templates go together so you don't re-select them every time
+                **Default tags** — Pre-configure which context tags to apply, streamlining trip creation to a single click
+                **Organization** — Group related templates under a meaningful name that appears in your template list
+
+                Composites and regular templates can coexist. You can even include a composite alongside individual templates when creating a trip.
                 """),
             ]
         }

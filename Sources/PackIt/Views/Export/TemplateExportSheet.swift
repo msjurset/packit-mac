@@ -48,7 +48,9 @@ struct TemplateExportSheet: View {
                 Section("Preview") {
                     Text("Template: \(template.name)")
                     Text("Items: \(template.itemCount)")
-                    Text("Categories: \(template.categories.count)")
+                    if template.prepTaskCount > 0 { Text("Prep Tasks: \(template.prepTaskCount)") }
+                    if !template.procedures.isEmpty { Text("Procedures: \(template.procedures.count)") }
+                    if !template.referenceLinks.isEmpty { Text("Links: \(template.referenceLinks.count)") }
                     if !template.contextTags.isEmpty {
                         Text("Tags: \(template.contextTags.joined(separator: ", "))")
                     }
@@ -161,28 +163,84 @@ struct TemplateExportSheet: View {
         for category in grouped.keys.sorted() {
             html += "<h2>\(esc(category))</h2>"
             for item in grouped[category] ?? [] {
-                let priorityCls = item.priority >= .high ? " priority-\(item.priority.rawValue)" : ""
                 let qty = item.quantity > 1 ? " ×\(item.quantity)" : ""
-                html += "<div class=\"item\"><input type=\"checkbox\" class=\"checkbox\"><span class=\"\(priorityCls)\">\(esc(item.name))\(qty)</span>"
-                if let notes = item.notes, !notes.isEmpty {
-                    html += "<span class=\"notes\">\(esc(notes))</span>"
-                }
-                html += "</div>"
+                var extra = ""
+                if let owner = item.owner, !owner.isEmpty { extra += " <span class=\"tag\" style=\"background:#e8e0f0;color:#6b4c9a\">\(esc(owner))</span>" }
+                if let notes = item.notes, !notes.isEmpty { extra += " <span class=\"notes\">\(esc(notes))</span>" }
+                html += "<div class=\"item\"><input type=\"checkbox\" class=\"checkbox\"><span>\(esc(item.name))\(qty)</span>\(extra)</div>"
             }
+        }
+
+        if template.prepTaskCount > 0 {
+            html += "<h2>Prep Tasks</h2>"
+            let prepGrouped = Dictionary(grouping: template.prepTasks, by: \.timing)
+            for timing in PrepTaskTiming.allCases {
+                guard let tasks = prepGrouped[timing], !tasks.isEmpty else { continue }
+                html += "<h3>\(timing.label)</h3>"
+                for task in tasks {
+                    var extra = ""
+                    if let cat = task.category { extra += " <span class=\"tag\">\(esc(cat))</span>" }
+                    html += "<div class=\"item\"><input type=\"checkbox\" class=\"checkbox\"><span>\(esc(task.name))</span>\(extra)</div>"
+                }
+            }
+        }
+
+        for proc in template.procedures {
+            html += "<h2>\(esc(proc.name)) <small style=\"color:#999\">\(proc.phase.label)</small></h2>"
+            for (i, step) in proc.steps.sorted(by: { $0.sortOrder < $1.sortOrder }).enumerated() {
+                var notes = ""
+                if let n = step.notes, !n.isEmpty { notes = " <span class=\"notes\">\(esc(n))</span>" }
+                html += "<div class=\"item\" style=\"padding-left:24px\"><span style=\"color:#999;font-size:12px\">\(i+1).</span> <span>\(esc(step.text))</span>\(notes)</div>"
+            }
+        }
+
+        if !template.referenceLinks.isEmpty {
+            html += "<h2>Reference Links</h2><ul>"
+            for link in template.referenceLinks {
+                html += "<li><a href=\"\(esc(link.url))\" style=\"color:#1a7a7a\">\(esc(link.label))</a></li>"
+            }
+            html += "</ul>"
         }
 
         html += "</body></html>"
         return html
     }
 
+    private func csvEsc(_ text: String) -> String {
+        text.replacingOccurrences(of: "\"", with: "\"\"")
+    }
+
     private func generateCSV() -> String {
-        var csv = "Category,Item,Quantity,Priority,Notes,Tags\n"
+        var csv = "ITEMS\n"
+        csv += "Category,Item,Owner,Quantity,Priority,Notes,Tags\n"
         for item in template.items {
-            let cat = item.category ?? ""
-            let notes = (item.notes ?? "").replacingOccurrences(of: "\"", with: "\"\"")
-            let tags = item.contextTags.joined(separator: "; ")
-            csv += "\"\(cat)\",\"\(item.name)\",\"\(item.quantity)\",\"\(item.priority.label)\",\"\(notes)\",\"\(tags)\"\n"
+            csv += "\"\(csvEsc(item.category ?? ""))\",\"\(csvEsc(item.name))\",\"\(csvEsc(item.owner ?? ""))\",\"\(item.quantity)\",\"\(item.priority.label)\",\"\(csvEsc(item.notes ?? ""))\",\"\(item.contextTags.joined(separator: "; "))\"\n"
         }
+
+        if template.prepTaskCount > 0 {
+            csv += "\nPREP TASKS\n"
+            csv += "Timing,Task,Category,Tags\n"
+            for task in template.prepTasks {
+                csv += "\"\(task.timing.label)\",\"\(csvEsc(task.name))\",\"\(csvEsc(task.category ?? ""))\",\"\(task.contextTags.joined(separator: "; "))\"\n"
+            }
+        }
+
+        for proc in template.procedures {
+            csv += "\nPROCEDURE: \(proc.name) (\(proc.phase.label))\n"
+            csv += "Step,Description,Notes\n"
+            for (i, step) in proc.steps.sorted(by: { $0.sortOrder < $1.sortOrder }).enumerated() {
+                csv += "\"\(i+1)\",\"\(csvEsc(step.text))\",\"\(csvEsc(step.notes ?? ""))\"\n"
+            }
+        }
+
+        if !template.referenceLinks.isEmpty {
+            csv += "\nREFERENCE LINKS\n"
+            csv += "Label,URL\n"
+            for link in template.referenceLinks {
+                csv += "\"\(csvEsc(link.label))\",\"\(csvEsc(link.url))\"\n"
+            }
+        }
+
         return csv
     }
 }

@@ -11,6 +11,9 @@ struct PackItApp: App {
         WindowGroup {
             ContentView()
                 .environment(store)
+                .preferredColorScheme(store.colorScheme)
+                .onAppear { store.startBackgroundRefresh() }
+                .onDisappear { store.stopBackgroundRefresh() }
         }
         .defaultSize(width: 1100, height: 700)
         .commands {
@@ -28,6 +31,7 @@ struct PackItApp: App {
         Settings {
             SettingsView()
                 .environment(store)
+                .preferredColorScheme(store.colorScheme)
         }
 
         WindowGroup("PackIt Help", id: "help") {

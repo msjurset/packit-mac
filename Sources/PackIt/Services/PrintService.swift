@@ -63,6 +63,12 @@ class PackingListPrintView: NSView {
         var colY: CGFloat = 0
 
         for block in blocks {
+            if case .pageBreak = block.type {
+                pageCount += 1
+                colIndex = 0
+                colY = 0
+                continue
+            }
             let blockHeight = block.height
             if colY + blockHeight > usableHeight {
                 colIndex += 1
@@ -87,6 +93,15 @@ class PackingListPrintView: NSView {
     enum BlockType {
         case categoryHeader(String, Int, Int) // name, packed, total
         case item(TripItem)
+        case prepHeader(String) // timing label
+        case prepTask(PrepTask)
+        case procedureHeader(String, String) // name, phase
+        case procedureStep(Int, ProcedureStep) // number, step
+        case mealDayHeader(String) // "Thu May 7"
+        case mealRow(String, String) // meal type label, items text
+        case textLine(String) // generic text line (activities, links)
+        case sectionTitle(String) // bold section title
+        case pageBreak // force new page
     }
 
     struct RenderBlock {
@@ -109,6 +124,77 @@ class PackingListPrintView: NSView {
             }
             blocks.append(RenderBlock(type: .categoryHeader("", 0, 0), height: categorySpacing)) // spacer
         }
+
+        // Prep tasks by timing
+        if !trip.prepTasks.isEmpty {
+            blocks.append(RenderBlock(type: .pageBreak, height: 0))
+            blocks.append(RenderBlock(type: .categoryHeader("Prep Tasks", 0, 0), height: categoryHeaderHeight + categorySpacing))
+            let prepGrouped = Dictionary(grouping: trip.prepTasks, by: \.timing)
+            for timing in PrepTaskTiming.allCases {
+                guard let tasks = prepGrouped[timing], !tasks.isEmpty else { continue }
+                blocks.append(RenderBlock(type: .prepHeader(timing.label), height: categoryHeaderHeight))
+                for task in tasks {
+                    blocks.append(RenderBlock(type: .prepTask(task), height: itemHeight))
+                }
+                blocks.append(RenderBlock(type: .categoryHeader("", 0, 0), height: categorySpacing))
+            }
+        }
+
+        // Procedures
+        if !trip.procedures.isEmpty {
+            blocks.append(RenderBlock(type: .pageBreak, height: 0))
+            for proc in trip.procedures.sorted(by: { $0.phase < $1.phase }) {
+                blocks.append(RenderBlock(type: .procedureHeader(proc.name, proc.phase.label), height: categoryHeaderHeight + categorySpacing))
+                for (i, step) in proc.steps.sorted(by: { $0.sortOrder < $1.sortOrder }).enumerated() {
+                    blocks.append(RenderBlock(type: .procedureStep(i + 1, step), height: itemHeight))
+                }
+                blocks.append(RenderBlock(type: .categoryHeader("", 0, 0), height: categorySpacing))
+            }
+        }
+
+        // Meal Plan
+        if let plan = trip.mealPlan, !plan.days.isEmpty {
+            blocks.append(RenderBlock(type: .pageBreak, height: 0))
+            blocks.append(RenderBlock(type: .sectionTitle("Meal Plan"), height: categoryHeaderHeight + categorySpacing))
+            if !plan.prepNotes.isEmpty {
+                // Estimate height based on text length (roughly 80 chars per line at 8.5pt)
+                let lineCount = max(1, Int(ceil(Double(plan.prepNotes.count) / 80.0)))
+                blocks.append(RenderBlock(type: .textLine("Prep: " + plan.prepNotes), height: CGFloat(lineCount) * 12 + 4))
+                blocks.append(RenderBlock(type: .categoryHeader("", 0, 0), height: categorySpacing))
+            }
+            for day in plan.days {
+                let label = day.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+                blocks.append(RenderBlock(type: .mealDayHeader(label), height: categoryHeaderHeight))
+                for type in MealType.allCases {
+                    let slot = day.slot(for: type)
+                    if !slot.isEmpty {
+                        blocks.append(RenderBlock(type: .mealRow(type.label, slot.display), height: itemHeight))
+                    }
+                }
+                blocks.append(RenderBlock(type: .categoryHeader("", 0, 0), height: categorySpacing))
+            }
+        }
+
+        // Activities & Links
+        if !trip.activities.isEmpty || !trip.referenceLinks.isEmpty {
+            blocks.append(RenderBlock(type: .pageBreak, height: 0))
+        }
+        if !trip.activities.isEmpty {
+            blocks.append(RenderBlock(type: .sectionTitle("Activities"), height: categoryHeaderHeight + categorySpacing))
+            for activity in trip.activities.sorted(by: { $0.sortOrder < $1.sortOrder }) {
+                blocks.append(RenderBlock(type: .textLine("• " + activity.text), height: itemHeight))
+            }
+            blocks.append(RenderBlock(type: .categoryHeader("", 0, 0), height: categorySpacing))
+        }
+
+        // Reference Links
+        if !trip.referenceLinks.isEmpty {
+            blocks.append(RenderBlock(type: .sectionTitle("Reference Links"), height: categoryHeaderHeight + categorySpacing))
+            for link in trip.referenceLinks {
+                blocks.append(RenderBlock(type: .textLine(link.label + " — " + link.url), height: itemHeight))
+            }
+        }
+
         return blocks
     }
 
@@ -149,6 +235,13 @@ class PackingListPrintView: NSView {
         var colY: CGFloat = 0
 
         for block in blocks {
+            // Page break forces new page
+            if case .pageBreak = block.type {
+                pageIdx += 1
+                colIndex = 0
+                colY = 0
+                continue
+            }
             // Skip empty spacer blocks
             if case .categoryHeader(let name, _, _) = block.type, name.isEmpty {
                 colY += block.height
@@ -176,6 +269,24 @@ class PackingListPrintView: NSView {
                     }
                 case .item(let item):
                     drawItem(item, at: CGPoint(x: colX, y: drawY), width: colWidth, context: context)
+                case .prepHeader(let label):
+                    drawPrepHeader(label, at: CGPoint(x: colX, y: drawY), width: colWidth, context: context)
+                case .prepTask(let task):
+                    drawPrepTask(task, at: CGPoint(x: colX, y: drawY), width: colWidth, context: context)
+                case .procedureHeader(let name, let phase):
+                    drawProcedureHeader(name, phase: phase, at: CGPoint(x: colX, y: drawY), width: colWidth, context: context)
+                case .procedureStep(let num, let step):
+                    drawProcedureStep(num, step: step, at: CGPoint(x: colX, y: drawY), width: colWidth, context: context)
+                case .mealDayHeader(let label):
+                    drawMealDayHeader(label, at: CGPoint(x: colX, y: drawY), width: colWidth, context: context)
+                case .mealRow(let mealType, let items):
+                    drawMealRow(mealType, items: items, at: CGPoint(x: colX, y: drawY), width: colWidth, context: context)
+                case .sectionTitle(let title):
+                    drawSectionTitle(title, at: CGPoint(x: colX, y: drawY), width: colWidth, context: context)
+                case .textLine(let text):
+                    drawTextLine(text, at: CGPoint(x: colX, y: drawY), width: colWidth, context: context)
+                case .pageBreak:
+                    break
                 }
             }
 
@@ -306,6 +417,160 @@ class PackingListPrintView: NSView {
             let noteAttrs: [NSAttributedString.Key: Any] = [.font: noteFont, .foregroundColor: NSColor.gray]
             NSAttributedString(string: notes, attributes: noteAttrs).draw(in: CGRect(x: textX, y: y - checkSize - 12, width: maxTextWidth, height: 10))
         }
+    }
+
+    // MARK: - Prep Task Drawing
+
+    private func drawPrepHeader(_ label: String, at point: CGPoint, width: CGFloat, context: CGContext) {
+        let y = point.y
+        let font = NSFont.systemFont(ofSize: 8, weight: .semibold)
+        let color = NSColor(red: 0.1, green: 0.55, blue: 0.55, alpha: 1)
+        NSAttributedString(string: label, attributes: [.font: font, .foregroundColor: color])
+            .draw(at: NSPoint(x: point.x + 2, y: y - 11))
+
+        context.setStrokeColor(CGColor(red: 0.1, green: 0.55, blue: 0.55, alpha: 0.3))
+        context.setLineWidth(0.5)
+        context.move(to: CGPoint(x: point.x, y: y - 15))
+        context.addLine(to: CGPoint(x: point.x + width, y: y - 15))
+        context.strokePath()
+    }
+
+    private func drawPrepTask(_ task: PrepTask, at point: CGPoint, width: CGFloat, context: CGContext) {
+        let checkSize: CGFloat = 7
+        let y = point.y - 4
+
+        // Checkbox
+        let checkRect = CGRect(x: point.x + 4, y: y - checkSize, width: checkSize, height: checkSize)
+        context.setLineWidth(0.6)
+        context.setStrokeColor(CGColor(gray: 0.5, alpha: 1))
+        let path = CGPath(roundedRect: checkRect, cornerWidth: 1.5, cornerHeight: 1.5, transform: nil)
+        context.addPath(path)
+        context.strokePath()
+
+        if task.isComplete {
+            context.setStrokeColor(CGColor(red: 0.2, green: 0.65, blue: 0.35, alpha: 1))
+            context.setLineWidth(1.0)
+            context.move(to: CGPoint(x: checkRect.minX + 1.5, y: checkRect.midY))
+            context.addLine(to: CGPoint(x: checkRect.midX, y: checkRect.minY + 1))
+            context.addLine(to: CGPoint(x: checkRect.maxX - 1.5, y: checkRect.maxY - 1.5))
+            context.strokePath()
+        }
+
+        // Name
+        let textX = point.x + checkSize + 10
+        let itemFont = NSFont.systemFont(ofSize: 9, weight: .regular)
+        let textColor: NSColor = task.isComplete ? .gray : .black
+        let textAttrs: [NSAttributedString.Key: Any] = [
+            .font: itemFont,
+            .foregroundColor: textColor,
+            .strikethroughStyle: task.isComplete ? NSUnderlineStyle.single.rawValue : 0,
+        ]
+        let maxTextWidth = width - (textX - point.x) - 4
+        NSAttributedString(string: task.name, attributes: textAttrs)
+            .draw(in: CGRect(x: textX, y: y - checkSize - 1, width: maxTextWidth, height: 14))
+
+        // Due date (right-aligned)
+        let dateFont = NSFont.systemFont(ofSize: 7, weight: .regular)
+        let dateStr = task.dueDate.formatted(date: .abbreviated, time: .omitted)
+        let dateAS = NSAttributedString(string: dateStr, attributes: [.font: dateFont, .foregroundColor: NSColor.gray])
+        dateAS.draw(at: NSPoint(x: point.x + width - dateAS.size().width - 2, y: y - checkSize))
+    }
+
+    // MARK: - Procedure Drawing
+
+    private func drawProcedureHeader(_ name: String, phase: String, at point: CGPoint, width: CGFloat, context: CGContext) {
+        let y = point.y
+        let font = NSFont.systemFont(ofSize: 9, weight: .bold)
+        NSAttributedString(string: name, attributes: [.font: font, .foregroundColor: NSColor.black])
+            .draw(at: NSPoint(x: point.x + 2, y: y - 12))
+        let phaseFont = NSFont.systemFont(ofSize: 7, weight: .regular)
+        let phaseAS = NSAttributedString(string: phase, attributes: [.font: phaseFont, .foregroundColor: NSColor.gray])
+        phaseAS.draw(at: NSPoint(x: point.x + width - phaseAS.size().width - 2, y: y - 11))
+        context.setStrokeColor(CGColor(gray: 0.8, alpha: 1))
+        context.setLineWidth(0.5)
+        context.move(to: CGPoint(x: point.x, y: y - 16))
+        context.addLine(to: CGPoint(x: point.x + width, y: y - 16))
+        context.strokePath()
+    }
+
+    private func drawProcedureStep(_ num: Int, step: ProcedureStep, at point: CGPoint, width: CGFloat, context: CGContext) {
+        let y = point.y - 4
+        let checkSize: CGFloat = 7
+        // Square checkbox
+        let checkRect = CGRect(x: point.x + 4, y: y - checkSize, width: checkSize, height: checkSize)
+        context.setLineWidth(0.6)
+        context.setStrokeColor(CGColor(gray: 0.5, alpha: 1))
+        let path = CGPath(roundedRect: checkRect, cornerWidth: 1.5, cornerHeight: 1.5, transform: nil)
+        context.addPath(path)
+        context.strokePath()
+        if step.isComplete {
+            context.setStrokeColor(CGColor(red: 0.2, green: 0.65, blue: 0.35, alpha: 1))
+            context.setLineWidth(1.0)
+            context.move(to: CGPoint(x: checkRect.minX + 1.5, y: checkRect.midY))
+            context.addLine(to: CGPoint(x: checkRect.midX, y: checkRect.minY + 1))
+            context.addLine(to: CGPoint(x: checkRect.maxX - 1.5, y: checkRect.maxY - 1.5))
+            context.strokePath()
+        }
+        // Number
+        let numFont = NSFont.monospacedDigitSystemFont(ofSize: 7, weight: .regular)
+        NSAttributedString(string: "\(num).", attributes: [.font: numFont, .foregroundColor: NSColor.gray])
+            .draw(at: NSPoint(x: point.x + checkSize + 8, y: y - checkSize - 1))
+        // Text
+        let textX = point.x + checkSize + 22
+        let itemFont = NSFont.systemFont(ofSize: 9, weight: .regular)
+        let textColor: NSColor = step.isComplete ? .gray : .black
+        let textAttrs: [NSAttributedString.Key: Any] = [.font: itemFont, .foregroundColor: textColor, .strikethroughStyle: step.isComplete ? NSUnderlineStyle.single.rawValue : 0]
+        NSAttributedString(string: step.text, attributes: textAttrs)
+            .draw(in: CGRect(x: textX, y: y - checkSize - 1, width: width - (textX - point.x) - 4, height: 14))
+    }
+
+    // MARK: - Meal Plan Drawing
+
+    private func drawMealDayHeader(_ label: String, at point: CGPoint, width: CGFloat, context: CGContext) {
+        let y = point.y
+        let font = NSFont.systemFont(ofSize: 8, weight: .bold)
+        let color = NSColor(red: 0.1, green: 0.55, blue: 0.55, alpha: 1)
+        NSAttributedString(string: label, attributes: [.font: font, .foregroundColor: color])
+            .draw(at: NSPoint(x: point.x + 2, y: y - 11))
+        context.setStrokeColor(CGColor(red: 0.1, green: 0.55, blue: 0.55, alpha: 0.3))
+        context.setLineWidth(0.4)
+        context.move(to: CGPoint(x: point.x, y: y - 14))
+        context.addLine(to: CGPoint(x: point.x + width, y: y - 14))
+        context.strokePath()
+    }
+
+    private func drawMealRow(_ mealType: String, items: String, at point: CGPoint, width: CGFloat, context: CGContext) {
+        let y = point.y - 4
+        let labelFont = NSFont.systemFont(ofSize: 7.5, weight: .semibold)
+        NSAttributedString(string: mealType, attributes: [.font: labelFont, .foregroundColor: NSColor.darkGray])
+            .draw(at: NSPoint(x: point.x + 6, y: y - 10))
+        let textFont = NSFont.systemFont(ofSize: 8, weight: .regular)
+        NSAttributedString(string: items, attributes: [.font: textFont, .foregroundColor: NSColor.black])
+            .draw(in: CGRect(x: point.x + 65, y: y - 11, width: width - 70, height: 12))
+    }
+
+    // MARK: - Generic Drawing
+
+    private func drawSectionTitle(_ title: String, at point: CGPoint, width: CGFloat, context: CGContext) {
+        let y = point.y
+        let font = NSFont.systemFont(ofSize: 10, weight: .bold)
+        NSAttributedString(string: title, attributes: [.font: font, .foregroundColor: NSColor.black])
+            .draw(at: NSPoint(x: point.x + 2, y: y - 13))
+        context.setStrokeColor(CGColor(gray: 0.7, alpha: 1))
+        context.setLineWidth(0.8)
+        context.move(to: CGPoint(x: point.x, y: y - 17))
+        context.addLine(to: CGPoint(x: point.x + width, y: y - 17))
+        context.strokePath()
+    }
+
+    private func drawTextLine(_ text: String, at point: CGPoint, width: CGFloat, context: CGContext) {
+        let font = NSFont.systemFont(ofSize: 8.5, weight: .regular)
+        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black]
+        let maxWidth = width - 10
+        let as_ = NSAttributedString(string: text, attributes: attrs)
+        let boundingRect = as_.boundingRect(with: CGSize(width: maxWidth, height: 200), options: [.usesLineFragmentOrigin])
+        let drawY = point.y - boundingRect.height - 2
+        as_.draw(in: CGRect(x: point.x + 6, y: drawY, width: maxWidth, height: boundingRect.height + 2))
     }
 }
 

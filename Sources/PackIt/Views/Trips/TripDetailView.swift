@@ -7,32 +7,84 @@ struct TripDetailView: View {
     @State private var pendingReminders = 0
     @State private var showInspector = true
     @State private var newTodoText = ""
+    @State private var viewMode: TripViewMode = .packing
+
+    enum TripViewMode: String, CaseIterable {
+        case packing = "Packing"
+        case meals = "Meals"
+        case procedures = "Procedures"
+    }
 
     enum TripSheet: Identifiable {
         case edit
         case addItem
         case merge
         case export
+        case printSettings
+        case addPrepTask
+        case editItems
+        case reviewItems
+        case importTemplate
 
         var id: String { String(describing: self) }
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+        VStack(spacing: 0) {
+            // Pinned trip header + view mode toggle
+            VStack(spacing: 6) {
                 tripHeader
                     .padding(.horizontal)
+                    .padding(.top, 10)
 
-                if !trip.overdueItems.isEmpty {
-                    overdueSection
-                        .padding(.horizontal)
+                Picker("View", selection: $viewMode) {
+                    ForEach(TripViewMode.allCases, id: \.self) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
                 }
-
-                packingSection
-                    .padding(.horizontal)
-
+                .pickerStyle(.segmented)
+                .frame(width: 280)
+                .padding(.bottom, 6)
             }
-            .padding(.vertical)
+            .background(.background)
+
+            // Subtle gradient separator
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [.secondary.opacity(0.08), .clear],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+                .frame(height: 4)
+
+            if viewMode == .packing {
+                // Prep tasks (left) + Packing list (right) as siblings
+                HStack(alignment: .top, spacing: 0) {
+                    if !trip.prepTasks.isEmpty {
+                        prepTaskTimeline
+                            .frame(width: 220)
+                        Divider()
+                    }
+
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 20) {
+                            if !trip.overdueItems.isEmpty {
+                                overdueSection
+                                    .padding(.horizontal)
+                            }
+
+                            packingSection
+                                .padding(.horizontal)
+                        }
+                        .padding(.vertical)
+                    }
+                }
+            } else if viewMode == .meals {
+                MealPlanView(trip: trip)
+            } else {
+                ProcedureChecklistView(trip: trip)
+            }
         }
         .accessibilityIdentifier("tripDetail")
         .navigationTitle(trip.name)
@@ -43,6 +95,9 @@ struct TripDetailView: View {
                         statusMenuItems
                     }
                     Section {
+                        Button { activeSheet = .importTemplate } label: {
+                            Label("Import Template...", systemImage: "arrow.down.doc")
+                        }
                         if !trip.adHocItems.isEmpty {
                             Button { activeSheet = .merge } label: {
                                 Label("Merge to Template...", systemImage: "arrow.up.doc")
@@ -56,7 +111,7 @@ struct TripDetailView: View {
                     Label("Actions", systemImage: "ellipsis.circle")
                 }
 
-                Button { store.printTrip(trip) } label: {
+                Button { activeSheet = .printSettings } label: {
                     Label("Print", systemImage: "printer")
                 }
                 .help("Print packing list")
@@ -64,7 +119,21 @@ struct TripDetailView: View {
                 Button { activeSheet = .edit } label: {
                     Label("Edit Trip", systemImage: "pencil")
                 }
+            }
 
+            ToolbarItem(placement: .automatic) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        store.tripDetailFullscreen.toggle()
+                    }
+                } label: {
+                    Image(systemName: store.tripDetailFullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                        .foregroundStyle(.secondary)
+                }
+                .help(store.tripDetailFullscreen ? "Exit fullscreen" : "Fullscreen")
+            }
+
+            ToolbarItem(placement: .automatic) {
                 Button { showInspector.toggle() } label: {
                     Label("Inspector", systemImage: "sidebar.trailing")
                         .foregroundStyle(showInspector ? .packitTeal : .secondary)
@@ -86,10 +155,28 @@ struct TripDetailView: View {
                 MergeToTemplateSheet(trip: trip)
             case .export:
                 ExportSheet(trip: trip)
+            case .printSettings:
+                PrintSettingsSheet(trip: trip)
+            case .addPrepTask:
+                AddPrepTaskSheet(tripID: trip.id, departureDate: trip.departureDate, returnDate: trip.returnDate)
+            case .editItems:
+                TripItemListEditor(tripID: trip.id)
+            case .reviewItems:
+                TripItemListEditor(tripID: trip.id, isReview: true)
+            case .importTemplate:
+                ImportTemplateSheet(tripID: trip.id)
             }
         }
         .task {
             pendingReminders = await NotificationService.shared.pendingCount(for: trip.id)
+        }
+        .onAppear {
+            if store.showEditItemsOnNextTrip {
+                store.showEditItemsOnNextTrip = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    activeSheet = .reviewItems
+                }
+            }
         }
     }
 
@@ -98,13 +185,15 @@ struct TripDetailView: View {
     private var tripHeader: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Image(systemName: trip.status.icon)
-                        .foregroundStyle(Color.statusColor(trip.status))
-                        .font(.title3)
-                    Text(trip.status.label)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    TripIconView(icon: trip.icon, size: 32)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(trip.name)
+                            .font(.title3.bold())
+                        Text(trip.status.label)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 HStack(spacing: 16) {
                     Label(trip.departureDate.formatted(date: .long, time: .omitted), systemImage: "airplane.departure")
@@ -202,6 +291,13 @@ struct TripDetailView: View {
                 Text("Packing List")
                     .font(.headline)
                 Spacer()
+                Button { activeSheet = .editItems } label: {
+                    Label("Edit List", systemImage: "pencil.line")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+
                 Button { activeSheet = .addItem } label: {
                     Label("Add Item", systemImage: "plus.circle")
                         .font(.caption)
@@ -214,6 +310,139 @@ struct TripDetailView: View {
                 CategorySection(category: category, items: grouped[category] ?? [], tripID: trip.id, isAlternate: index.isMultiple(of: 2))
             }
         }
+    }
+
+    // MARK: - Prep Task Timeline
+
+    private var prepTaskTimeline: some View {
+        let grouped = Dictionary(grouping: trip.prepTasks, by: \.timing)
+        let timingsWithTasks = PrepTaskTiming.allCases.filter { grouped[$0] != nil && !grouped[$0]!.isEmpty }
+
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                // Header
+                HStack {
+                    Text("Prep")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button { activeSheet = .editItems } label: {
+                        Image(systemName: "pencil.line")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Edit prep tasks")
+                    Button { activeSheet = .addPrepTask } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.packitTeal)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+
+                // Timeline
+                ForEach(Array(timingsWithTasks.enumerated()), id: \.element) { index, timing in
+                    let tasks = grouped[timing] ?? []
+                    let isLast = index == timingsWithTasks.count - 1
+
+                    HStack(alignment: .top, spacing: 0) {
+                        // Timeline node (line is drawn as background behind all nodes)
+                        VStack(spacing: 0) {
+                            // Space above first node, or line from previous
+                            Rectangle()
+                                .fill(index > 0 ? Color.packitTeal.opacity(0.25) : .clear)
+                                .frame(width: 2, height: index > 0 ? 6 : 4)
+
+                            // Node
+                            ZStack {
+                                Circle()
+                                    .fill(.packitTeal.opacity(0.15))
+                                    .frame(width: 24, height: 24)
+                                Circle()
+                                    .strokeBorder(.packitTeal.opacity(0.35), lineWidth: 1.2)
+                                    .frame(width: 24, height: 24)
+                                Image(systemName: timing.icon)
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(.packitTeal)
+                            }
+
+                            // Continuous line to next node with midpoint chevron
+                            if !isLast {
+                                VStack(spacing: 0) {
+                                    Rectangle()
+                                        .fill(.packitTeal.opacity(0.25))
+                                        .frame(width: 2)
+                                        .frame(maxHeight: .infinity)
+                                    Image(systemName: "chevron.compact.down")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(.packitTeal.opacity(0.35))
+                                    Rectangle()
+                                        .fill(.packitTeal.opacity(0.25))
+                                        .frame(width: 2)
+                                        .frame(maxHeight: .infinity)
+                                }
+                            }
+                        }
+                        .frame(width: 28)
+                        .padding(.leading, 8)
+
+                        // Content
+                        VStack(alignment: .leading, spacing: 4) {
+                            // Timing header
+                            HStack(spacing: 0) {
+                                Text(timing.label)
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(.packitTeal)
+                                Spacer()
+                                Text(tasks.first?.dueDate.formatted(date: .abbreviated, time: .omitted) ?? "")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.tertiary)
+                            }
+
+                            // Tasks
+                            ForEach(tasks) { task in
+                                HStack(spacing: 5) {
+                                    Button {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                                            store.togglePrepTask(tripID: trip.id, taskID: task.id)
+                                        }
+                                    } label: {
+                                        Image(systemName: task.isComplete ? "checkmark.circle.fill" : "circle")
+                                            .font(.caption2)
+                                            .foregroundStyle(task.isComplete ? .packitGreen : task.isOverdue ? .packitRed : .secondary)
+                                            .contentTransition(.symbolEffect(.replace))
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    Text(task.name)
+                                        .font(.system(size: 11))
+                                        .strikethrough(task.isComplete)
+                                        .foregroundStyle(task.isComplete ? .tertiary : .primary)
+                                        .lineLimit(1)
+                                }
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        store.removePrepTask(from: trip.id, taskID: task.id)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.leading, 6)
+                        .padding(.trailing, 10)
+                        .padding(.vertical, 4)
+                    }
+                }
+
+                Spacer(minLength: 20)
+            }
+        }
+        .background(.secondary.opacity(0.02))
     }
 
     // MARK: - Status Menu Items
@@ -311,9 +540,20 @@ struct TripInspectorView: View {
     @Binding var activeSheet: TripDetailView.TripSheet?
     let pendingReminders: Int
     @State private var newTodoText = ""
-    @State private var isEditingNotes = false
+    @State private var newActivityText = ""
+    @State private var newLinkLabel = ""
+    @State private var newLinkURL = ""
+    @State private var showAddLink = false
     @State private var editedNotes = ""
+    @State private var notesExpanded = false
+    @State private var notesCollapsed = false
+    @State private var todosCollapsed = false
+    @State private var activitiesCollapsed = false
+    @State private var weatherCollapsed = false
+    @State private var linksCollapsed = false
+    @State private var infoCollapsed = false
     @FocusState private var todoFieldFocused: Bool
+    @FocusState private var activityFieldFocused: Bool
 
     var body: some View {
         ScrollView {
@@ -323,8 +563,23 @@ struct TripInspectorView: View {
 
                 Divider()
 
+                // Activities
+                activitiesSection
+
+                Divider()
+
+                // Weather
+                WeatherWidget(trip: trip)
+
+                Divider()
+
                 // Notes
                 notesSection
+
+                Divider()
+
+                // Reference Links
+                referenceLinksSection
 
                 Divider()
 
@@ -339,9 +594,9 @@ struct TripInspectorView: View {
 
     private var todoSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("TODOs", systemImage: "checklist")
-                .font(.headline)
+            inspectorHeader("TODOs", icon: "checklist", collapsed: $todosCollapsed)
 
+            if !todosCollapsed {
             // Quick-add field
             HStack(spacing: 8) {
                 TextField("Add a todo...", text: $newTodoText)
@@ -420,6 +675,7 @@ struct TripInspectorView: View {
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
+            } // end if !todosCollapsed
         }
     }
 
@@ -431,67 +687,251 @@ struct TripInspectorView: View {
         todoFieldFocused = true
     }
 
+    // MARK: - Activities
+
+    private var activitiesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            inspectorHeader("Activities", icon: "sparkles", collapsed: $activitiesCollapsed)
+
+            if !activitiesCollapsed {
+            HStack(spacing: 8) {
+                TextField("Add an activity...", text: $newActivityText)
+                    .textFieldStyle(.plain)
+                    .font(.callout)
+                    .focused($activityFieldFocused)
+                    .onSubmit { addActivity() }
+                    .padding(8)
+                    .background(.secondary.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                Button(action: addActivity) {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundStyle(.packitTeal)
+                        .font(.title3)
+                }
+                .buttonStyle(.plain)
+                .disabled(newActivityText.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+
+            if trip.activities.isEmpty {
+                Text("Add planned activities for inspiration — dinners, excursions, sightseeing...")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 8)
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(trip.activities.sorted(by: { $0.sortOrder < $1.sortOrder })) { activity in
+                        ActivityRow(activity: activity, tripID: trip.id)
+                    }
+                }
+            }
+            } // end if !activitiesCollapsed
+        }
+    }
+
+    private func addActivity() {
+        let trimmed = newActivityText.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        store.addActivity(to: trip.id, text: trimmed)
+        newActivityText = ""
+        activityFieldFocused = true
+    }
+
+    // MARK: - Reference Links
+
+    private var referenceLinksSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            inspectorHeader("Links", icon: "link", collapsed: $linksCollapsed, trailing: {
+                Button {
+                    showAddLink.toggle()
+                    newLinkLabel = ""
+                    newLinkURL = ""
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundStyle(.packitTeal)
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+            })
+
+            if !linksCollapsed {
+            if showAddLink {
+                VStack(spacing: 4) {
+                    TextField("Label", text: $newLinkLabel)
+                        .textFieldStyle(.plain)
+                        .font(.callout)
+                    TextField("URL", text: $newLinkURL)
+                        .textFieldStyle(.plain)
+                        .font(.caption)
+                        .onSubmit { addLink() }
+                    HStack {
+                        Button("Add") { addLink() }
+                            .font(.caption)
+                            .disabled(newLinkLabel.isEmpty || newLinkURL.isEmpty)
+                        Button("Cancel") { showAddLink = false }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                }
+                .padding(8)
+                .background(.secondary.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+
+            if trip.referenceLinks.isEmpty && !showAddLink {
+                Text("Add useful links: campground, vet, park info...")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(trip.referenceLinks) { link in
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.up.right.square")
+                                .font(.caption2)
+                                .foregroundStyle(.packitTeal)
+                            if let url = link.validURL {
+                                Link(link.label, destination: url)
+                                    .font(.callout)
+                            } else {
+                                Text(link.label)
+                                    .font(.callout)
+                            }
+                            Spacer()
+                        }
+                        .contextMenu {
+                            if let url = link.validURL {
+                                Button {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(url.absoluteString, forType: .string)
+                                } label: {
+                                    Label("Copy URL", systemImage: "doc.on.doc")
+                                }
+                            }
+                            Divider()
+                            Button(role: .destructive) {
+                                store.removeReferenceLink(from: trip.id, linkID: link.id)
+                            } label: {
+                                Label("Remove", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+            }
+            } // end if !linksCollapsed
+        }
+    }
+
+    @ViewBuilder
+    private func renderedMarkdown(_ source: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(Array(source.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
+                if line.hasPrefix("# ") {
+                    Text(mdInline(String(line.dropFirst(2))))
+                        .font(.subheadline.bold())
+                } else if line.hasPrefix("## ") {
+                    Text(mdInline(String(line.dropFirst(3))))
+                        .font(.callout.bold())
+                } else if line.hasPrefix("### ") {
+                    Text(mdInline(String(line.dropFirst(4))))
+                        .font(.callout.weight(.semibold))
+                } else if line.hasPrefix("- ") || line.hasPrefix("* ") {
+                    HStack(alignment: .top, spacing: 4) {
+                        Text("•").foregroundStyle(.secondary).font(.caption)
+                        Text(mdInline(String(line.dropFirst(2)))).font(.caption)
+                    }
+                } else if line.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Spacer().frame(height: 2)
+                } else {
+                    Text(mdInline(line)).font(.caption)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func mdInline(_ text: String) -> AttributedString {
+        (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text)
+    }
+
+    private func inspectorHeader(_ title: String, icon: String, collapsed: Binding<Bool>, @ViewBuilder trailing: () -> some View = { EmptyView() }) -> some View {
+        HStack(spacing: 4) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    collapsed.wrappedValue.toggle()
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: collapsed.wrappedValue ? "chevron.right" : "chevron.down")
+                        .font(.system(size: 8))
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 8)
+                    Label(title, systemImage: icon)
+                        .font(.headline)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            Spacer()
+            trailing()
+        }
+    }
+
+    private func addLink() {
+        guard !newLinkLabel.isEmpty, !newLinkURL.isEmpty else { return }
+        var url = newLinkURL
+        if !url.contains("://") { url = "https://" + url }
+        store.addReferenceLink(to: trip.id, label: newLinkLabel, url: url, category: nil)
+        showAddLink = false
+    }
+
     // MARK: - Notes
 
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label("Notes", systemImage: "note.text")
-                    .font(.headline)
-                Spacer()
-                if isEditingNotes {
-                    Button("Done") { saveNotes() }
-                        .font(.caption)
-                        .foregroundStyle(.packitTeal)
+            inspectorHeader("Notes", icon: "note.text", collapsed: $notesCollapsed)
+
+            if !notesCollapsed {
+            // Compact preview — click anywhere to pop out editor
+            Group {
+                if editedNotes.isEmpty {
+                    Text("Click to add notes...")
+                        .font(.callout)
+                        .foregroundStyle(.tertiary)
                 } else {
-                    Button("Edit") {
-                        editedNotes = trip.scratchNotes
-                        isEditingNotes = true
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.packitTeal)
+                    renderedMarkdown(editedNotes)
+                        .foregroundStyle(.secondary)
                 }
             }
-
-            if isEditingNotes {
-                TextEditor(text: $editedNotes)
-                    .font(.callout)
-                    .frame(minHeight: 100, maxHeight: 200)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .strokeBorder(.separator, lineWidth: 0.5)
-                    )
-            } else {
-                Text(trip.scratchNotes.isEmpty ? "No notes yet..." : trip.scratchNotes)
-                    .font(.callout)
-                    .foregroundStyle(trip.scratchNotes.isEmpty ? .tertiary : .primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
-                    .background(.secondary.opacity(0.04))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .onTapGesture {
-                        editedNotes = trip.scratchNotes
-                        isEditingNotes = true
-                    }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxHeight: 100)
+            .padding(8)
+            .background(.secondary.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .contentShape(Rectangle())
+            .onTapGesture { notesExpanded = true }
+            .popover(isPresented: $notesExpanded, arrowEdge: .leading) {
+                NotesEditorSheet(text: $editedNotes)
             }
+            } // end if !notesCollapsed
+        }
+        .onAppear { editedNotes = trip.scratchNotes }
+        .onChange(of: editedNotes) {
+            var updated = trip
+            updated.scratchNotes = editedNotes
+            store.updateTrip(updated, actionName: "Edit Notes")
         }
     }
 
-    private func saveNotes() {
-        var updated = trip
-        updated.scratchNotes = editedNotes
-        store.updateTrip(updated)
-        isEditingNotes = false
-    }
 
     // MARK: - Trip Info
 
     private var infoSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("Trip Info", systemImage: "info.circle")
-                .font(.headline)
+            inspectorHeader("Trip Info", icon: "info.circle", collapsed: $infoCollapsed)
 
+            if !infoCollapsed {
             VStack(spacing: 6) {
                 infoRow(icon: "airplane.departure", label: "Departure", value: trip.departureDate.formatted(date: .long, time: .omitted))
                 if let ret = trip.returnDate {
@@ -506,6 +946,7 @@ struct TripInspectorView: View {
                     infoRow(icon: "sparkles", label: "New Items", value: "\(trip.adHocItems.count)")
                 }
             }
+            } // end if !infoCollapsed
         }
     }
 
@@ -525,42 +966,78 @@ struct TripInspectorView: View {
     }
 }
 
-// MARK: - Notes Editor Sheet (kept as fallback)
-
-struct NotesEditorSheet: View {
+struct ActivityRow: View {
     @Environment(PackItStore.self) private var store
-    @Environment(\.dismiss) private var dismiss
-    let trip: TripInstance
-    @State private var notes: String = ""
+    let activity: TripActivity
+    let tripID: UUID
+    @State private var isEditing = false
+    @State private var editText = ""
 
     var body: some View {
-        VStack(spacing: 0) {
-            Text("Trip Notes")
-                .font(.headline)
-                .padding()
+        HStack(spacing: 8) {
+            Image(systemName: "circle.fill")
+                .font(.system(size: 4))
+                .foregroundStyle(.packitTeal)
+                .padding(.top, 4)
 
-            TextEditor(text: $notes)
-                .font(.body)
-                .padding(.horizontal)
-                .frame(minHeight: 200)
-
-            Divider()
-
-            HStack {
-                Button("Cancel") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Spacer()
-                Button("Save") {
-                    var updated = trip
-                    updated.scratchNotes = notes
-                    store.updateTrip(updated)
-                    dismiss()
+            if isEditing {
+                HStack(spacing: 4) {
+                    TextField("Activity", text: $editText)
+                        .textFieldStyle(.plain)
+                        .font(.callout)
+                        .onSubmit { saveEdit() }
+                        .onExitCommand { isEditing = false }
+                    Button { saveEdit() } label: {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.packitGreen)
+                    }
+                    .buttonStyle(.plain)
+                    Button {
+                        store.removeActivity(from: tripID, activityID: activity.id)
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.caption)
+                            .foregroundStyle(.red.opacity(0.6))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .keyboardShortcut(.defaultAction)
+                .padding(4)
+                .background(.secondary.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+            } else {
+                Text(activity.text)
+                    .font(.callout)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2) {
+                        editText = activity.text
+                        isEditing = true
+                    }
             }
-            .padding()
         }
-        .frame(width: 500, height: 350)
-        .onAppear { notes = trip.scratchNotes }
+        .padding(.vertical, 2)
+        .contextMenu {
+            Button {
+                editText = activity.text
+                isEditing = true
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            Divider()
+            Button(role: .destructive) {
+                store.removeActivity(from: tripID, activityID: activity.id)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    private func saveEdit() {
+        let trimmed = editText.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        store.updateActivity(tripID: tripID, activityID: activity.id, text: trimmed)
+        isEditing = false
     }
 }
+

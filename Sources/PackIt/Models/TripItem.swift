@@ -4,6 +4,7 @@ struct TripItem: Codable, Identifiable, Hashable, Sendable {
     var id: UUID
     var name: String
     var category: String?
+    var owner: String?
     var priority: Priority
     var isPacked: Bool
     var notes: String?
@@ -12,10 +13,11 @@ struct TripItem: Codable, Identifiable, Hashable, Sendable {
     var isAdHoc: Bool
     var quantity: Int
 
-    init(id: UUID = UUID(), name: String, category: String? = nil, priority: Priority = .medium, isPacked: Bool = false, notes: String? = nil, dueDate: Date? = nil, sourceTemplateItemID: UUID? = nil, isAdHoc: Bool = false, quantity: Int = 1) {
+    init(id: UUID = UUID(), name: String, category: String? = nil, owner: String? = nil, priority: Priority = .medium, isPacked: Bool = false, notes: String? = nil, dueDate: Date? = nil, sourceTemplateItemID: UUID? = nil, isAdHoc: Bool = false, quantity: Int = 1) {
         self.id = id
         self.name = name
         self.category = category
+        self.owner = owner
         self.priority = priority
         self.isPacked = isPacked
         self.notes = notes
@@ -30,6 +32,7 @@ struct TripItem: Codable, Identifiable, Hashable, Sendable {
         self.id = UUID()
         self.name = templateItem.name
         self.category = templateItem.category
+        self.owner = templateItem.owner
         self.priority = templateItem.priority
         self.isPacked = false
         self.notes = templateItem.notes
@@ -44,6 +47,7 @@ struct TripItem: Codable, Identifiable, Hashable, Sendable {
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         category = try container.decodeIfPresent(String.self, forKey: .category)
+        owner = try container.decodeIfPresent(String.self, forKey: .owner)
         priority = try container.decodeIfPresent(Priority.self, forKey: .priority) ?? .medium
         isPacked = try container.decodeIfPresent(Bool.self, forKey: .isPacked) ?? false
         notes = try container.decodeIfPresent(String.self, forKey: .notes)

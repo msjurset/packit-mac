@@ -1,15 +1,19 @@
 # PackIt
 
-A macOS app for managing reusable packing list templates and trip-specific checklists.
+A macOS app for managing reusable packing list templates, trip-specific checklists, meal planning, and trip preparation workflows.
 
 ## Features
 
 ### Templates
 - Create reusable packing list templates organized by category
-- Add items with name, category, priority, quantity, notes, and context tags
-- Auto-suggest item names from existing templates and trips with auto-fill of fields
+- Add items with name, category, owner, priority, quantity, notes, and context tags
+- Auto-suggest item names from existing templates and trips with auto-fill
 - Comma-separated tag input with auto-suggest and Tab-cycling
 - Double-click items to edit; drag and drop to reorder
+- Composite templates that link other templates for one-click trip creation
+- Prep task templates with 6-tier timing (Early, 2 Weeks, 1 Week, Day Before, Day Of, On Return)
+- Procedure templates with ordered step-by-step workflows and phases
+- Reference links on templates that carry through to trips
 - Duplicate, export, and share templates
 
 ### Trips
@@ -18,14 +22,75 @@ A macOS app for managing reusable packing list templates and trip-specific check
 - Batch pack/unpack by category
 - Add ad-hoc items during a trip (marked with "new" badge)
 - Merge ad-hoc items back into templates after the trip
-- TODOs, notes, and inspector sidebar
+- Import additional templates into existing trips with dedup
+- Trip icons (16 themed options: beach, mountain, city, camping, etc.)
+- Destination with geocoding search
 - Trip statuses: Planning, Active, Completed, Archived
+- Fullscreen detail mode
+
+### Prep Tasks
+- 6-tier timing: Early (-21d), 2 Weeks (-14d), 1 Week (-7d), Day Before (-1d), Day Of, On Return
+- Timeline view with flow connectors in the trip detail
+- Due dates auto-calculated from departure/return dates
+- Ad-hoc prep tasks can be added directly to trips
+- Categories with auto-suggest (Home, Supplies, Travel Docs, Pets, Financial, and custom)
+
+### Procedures
+- Step-by-step workflow checklists (Before Departure, On Arrival, Before Leaving, On Return)
+- Ordered numbered steps with checkboxes, notes, and progress tracking
+- Edit mode with drag-to-reorder, add/remove steps, position insertion
+- Collapsible procedure cards grouped by phase
+- Templates carry procedures through to trips
+
+### Meal Planning
+- Day-by-day meal grid (Breakfast, Lunch, Dinner, Snacks, Beverages)
+- Auto-generated from trip dates
+- Click-to-edit cells with comma-separated food items
+- Food prep notes section
+- Dedicated "Meals" tab in trip detail
+
+### Weather
+- Daily weather forecast for trip destination
+- Three providers: Open-Meteo (free), WeatherAPI.com, Visual Crossing
+- Historical fallback for trips beyond forecast range
+- Compact widget in inspector with day/icon/temp/precip
+- Detail popover with wind, humidity, pressure, UV, feels-like, air quality
+- Configurable in Settings
+
+### Inspector Sidebar
+- TODOs with quick-add and priority
+- Activities for trip inspiration (inline add/edit)
+- Weather forecast widget
+- Notes with markdown support and pop-out editor
+- Reference links (clickable, with add/remove)
+- Trip info summary
+- All sections collapsible
 
 ### Context Tags
 - Tag templates and individual items for flexible filtering
-- Tags cascade across all views; renaming updates everywhere
-- Deleting a tag removes it from all templates and items
+- Tags cascade across all views; renaming/deleting updates everywhere
 - Manage tags globally from the Tags sidebar section
+
+### Sharing
+- Selective sharing via configurable shared folder (Google Drive, Dropbox, iCloud)
+- Share/unshare individual trips and templates
+- Background polling (45s) detects changes from other users
+- Conflict detection with notification banners
+- Version tracking and last-modified-by stamps
+
+### Print
+- Three layout modes: Standard (columns), Compact (category boxes), Dense (maximum density)
+- Print settings sheet with live preview before printing
+- Customizable watermarks: repeating patterns, full-page art, decorative borders
+- Each section prints on its own page (items, prep tasks, procedures, meal plan, activities/links)
+- All trip data included in print output
+
+### Export & Import
+- PackIt native files (.packitlist, .packittemplate) — full data round-trip
+- HTML export with dark mode support, styled tables, clickable links
+- CSV export with labeled sections for all data types
+- Multi-file import — select all and import in one batch
+- Import from Template button in the trip editor
 
 ### Statistics
 - Dashboard with trip counts, items packed, completion rate
@@ -33,18 +98,18 @@ A macOS app for managing reusable packing list templates and trip-specific check
 - Trip timeline with history
 
 ### Other
-- Print packing lists with customizable watermarks, borders, and patterns
-- Export trips and templates as PackIt files, HTML, or CSV
-- Departure and item due date reminders via macOS notifications
-- Quick search across templates and trips
+- Appearance toggle (System/Dark/Light)
+- Open on launch (Templates/Last Used)
+- Sparkle auto-update with EdDSA signing
+- Contextual help system with searchable topics
 - Full keyboard shortcut support
-- Contextual help system
+- Codesigned and notarized for macOS distribution
 
 ## Requirements
 
 - macOS 15.0+
 - Swift 6.0+
-- No external dependencies
+- Sparkle 2.7+ (auto-update framework)
 
 ## Build & Run
 
@@ -64,24 +129,38 @@ make uitest
 # Deploy to /Applications
 make deploy
 
-# Seed sample templates
-make seed
+# Create DMG
+make dmg
+
+# Full release (build, sign, notarize, publish)
+make release VERSION=1.0.0
+
+# Seed RV camping templates
+swift scripts/seed-rv-templates.swift
 ```
 
 ## Architecture
 
 - **SwiftUI** with `@Observable` + `@MainActor` state management
-- **File-based JSON persistence** in `~/.packit/` (templates/, trips/, tags.json, config.json)
-- **`PackItStore`** — central state manager with undo/redo support
-- **`Persistence`** actor — async file I/O
-- **Three-column layout** — Sidebar / List / Detail via `NavigationSplitView`
+- **File-based JSON persistence** in `~/.packit/` (local) and configurable shared folder
+- **`PackItStore`** — central state manager with undo/redo, sharing, conflict detection
+- **`Persistence`** actor — dual-directory async file I/O (local + shared)
+- **Two-column layout** — Sidebar via `NavigationSplitView`, detail with `HStack` sub-panels
 
 ### Data Flow
 
-Templates (reusable packing lists) are instantiated into TripInstances (actual trips with checklists). Context tags on templates and items enable composing new trips from multiple tagged sources. Ad-hoc items added during a trip can be promoted/merged back into templates.
+Templates (reusable packing lists) are instantiated into TripInstances (actual trips with checklists). Composite templates link other templates for one-click trip creation. Context tags on templates and items enable filtering during trip creation. Ad-hoc items added during a trip can be promoted/merged back into templates. Selective sharing moves individual resources between local and shared storage.
 
 ## Testing
 
 - **Unit tests** — Swift Testing framework (`@Test`, `#expect`) covering models, persistence, and store logic
 - **UI tests** — XCTest/XCUIApplication E2E tests covering navigation, selection, and empty states
 - Run `make test` for unit tests, `make uitest` for UI tests
+
+## License
+
+MIT License — see [LICENSE](LICENSE) for details.
+
+## Third-Party
+
+See [NOTICES](NOTICES) for third-party licenses and attributions.
