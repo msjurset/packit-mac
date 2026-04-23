@@ -1,6 +1,8 @@
 import SwiftUI
+import AppKit
 
 /// A text field that always left-aligns its text, bypassing macOS Form's forced right-alignment.
+/// Uses a subclassed NSTextField (`NoAutoFillTextField`) to suppress the macOS autofill/autocomplete popup.
 struct LeadingTextField: NSViewRepresentable {
     let label: String
     @Binding var text: String
@@ -12,7 +14,7 @@ struct LeadingTextField: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSTextField {
-        let tf = NSTextField()
+        let tf = NoAutoFillTextField()
         tf.alignment = .left
         tf.isBordered = true
         tf.isBezeled = true
@@ -55,5 +57,37 @@ struct LeadingTextField: NSViewRepresentable {
         func controlTextDidEndEditing(_ obj: Notification) {
             isFocused?.wrappedValue = false
         }
+    }
+}
+
+/// NSTextField that disables every macOS auto-* text feature at three different lifecycle points,
+/// which is necessary to reliably suppress the macOS autofill / autocomplete popup.
+final class NoAutoFillTextField: NSTextField {
+    override func becomeFirstResponder() -> Bool {
+        let ok = super.becomeFirstResponder()
+        if ok { disableAutoFeatures() }
+        return ok
+    }
+
+    override func textDidBeginEditing(_ notification: Notification) {
+        super.textDidBeginEditing(notification)
+        disableAutoFeatures()
+    }
+
+    override func textShouldBeginEditing(_ textObject: NSText) -> Bool {
+        disableAutoFeatures()
+        return super.textShouldBeginEditing(textObject)
+    }
+
+    private func disableAutoFeatures() {
+        guard let editor = currentEditor() as? NSTextView else { return }
+        editor.isAutomaticTextCompletionEnabled = false
+        editor.isAutomaticSpellingCorrectionEnabled = false
+        editor.isAutomaticTextReplacementEnabled = false
+        editor.isContinuousSpellCheckingEnabled = false
+        editor.isAutomaticQuoteSubstitutionEnabled = false
+        editor.isAutomaticDashSubstitutionEnabled = false
+        editor.isAutomaticDataDetectionEnabled = false
+        editor.isAutomaticLinkDetectionEnabled = false
     }
 }

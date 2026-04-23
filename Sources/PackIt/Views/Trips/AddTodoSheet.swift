@@ -20,7 +20,12 @@ struct AddTodoSheet: View {
             }
             Toggle("Due Date", isOn: $hasDueDate)
             if hasDueDate {
-                DatePicker("Due", selection: $dueDate, displayedComponents: .date)
+                LabeledContent("Due") {
+                    HStack(spacing: 6) {
+                        StepperDateField(selection: $dueDate)
+                        CalendarPopoverButton(selection: $dueDate)
+                    }
+                }
             }
         } footer: {
             Button("Cancel") { dismiss() }
