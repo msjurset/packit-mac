@@ -207,3 +207,106 @@ struct TripInstanceTests {
         #expect(trip.isDepartureSoon == false)
     }
 }
+
+@Suite("CreatedBy migration")
+struct CreatedByMigrationTests {
+    private var encoder: JSONEncoder {
+        let e = JSONEncoder()
+        e.dateEncodingStrategy = .iso8601
+        return e
+    }
+
+    private var decoder: JSONDecoder {
+        let d = JSONDecoder()
+        d.dateDecodingStrategy = .iso8601
+        return d
+    }
+
+    @Test("PackingTemplate decodes legacy JSON without createdBy")
+    func templateLegacyDecode() throws {
+        // JSON as written by a pre-createdBy version of the app.
+        let legacy = """
+        {
+          "id": "E3C15CA9-6B42-4ED1-AE5F-A5B9C1D4C3A7",
+          "name": "Legacy",
+          "items": [],
+          "prepTasks": [],
+          "procedures": [],
+          "referenceLinks": [],
+          "linkedTemplateIDs": [],
+          "contextTags": [],
+          "version": 1,
+          "createdAt": "2026-01-01T00:00:00Z",
+          "updatedAt": "2026-01-01T00:00:00Z"
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try decoder.decode(PackingTemplate.self, from: legacy)
+        #expect(decoded.name == "Legacy")
+        #expect(decoded.createdBy == nil)
+    }
+
+    @Test("PackingTemplate round-trips createdBy")
+    func templateRoundTrip() throws {
+        let template = PackingTemplate(name: "Shared", createdBy: "Kim")
+        let data = try encoder.encode(template)
+        let decoded = try decoder.decode(PackingTemplate.self, from: data)
+        #expect(decoded.createdBy == "Kim")
+    }
+
+    @Test("TripInstance decodes legacy JSON without createdBy")
+    func tripLegacyDecode() throws {
+        let legacy = """
+        {
+          "id": "F12C04B2-8E99-4E1B-B06E-9D4D6F6EE4A1",
+          "name": "Old Trip",
+          "icon": "suitcase",
+          "sourceTemplateIDs": [],
+          "departureDate": "2026-01-01T00:00:00Z",
+          "items": [],
+          "prepTasks": [],
+          "todos": [],
+          "activities": [],
+          "procedures": [],
+          "referenceLinks": [],
+          "scratchNotes": "",
+          "status": "planning",
+          "version": 1,
+          "createdAt": "2026-01-01T00:00:00Z",
+          "updatedAt": "2026-01-01T00:00:00Z"
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try decoder.decode(TripInstance.self, from: legacy)
+        #expect(decoded.name == "Old Trip")
+        #expect(decoded.createdBy == nil)
+    }
+
+    @Test("TripInstance round-trips createdBy")
+    func tripRoundTrip() throws {
+        let trip = TripInstance(name: "Shared", createdBy: "Kim")
+        let data = try encoder.encode(trip)
+        let decoded = try decoder.decode(TripInstance.self, from: data)
+        #expect(decoded.createdBy == "Kim")
+    }
+
+    @Test("LocalConfig decodes without lastSeenSharedAt")
+    func localConfigLegacyDecode() throws {
+        let legacy = """
+        {
+          "appearance": "system",
+          "launchView": "templates",
+          "lastNavigationKey": "templates",
+          "userName": "Me",
+          "sharedDataPath": "",
+          "weatherProvider": "openMeteo",
+          "weatherApiKey": "",
+          "visualCrossingApiKey": ""
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(LocalConfig.self, from: legacy)
+        #expect(decoded.userName == "Me")
+        #expect(decoded.lastSeenSharedAt == nil)
+    }
+}

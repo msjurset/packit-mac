@@ -30,7 +30,10 @@ struct TemplateListView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         ForEach(Array(store.filteredTemplates.enumerated()), id: \.element.id) { index, template in
-                            TemplateRow(template: template)
+                            TemplateRow(
+                                template: template,
+                                isReceivedShare: store.isReceivedShare(templateID: template.id)
+                            )
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 4)
@@ -93,6 +96,7 @@ struct TemplateListView: View {
                         .font(.caption)
                 }
                 .buttonStyle(.plain)
+                .focusable(false)
                 .foregroundStyle(.secondary)
                 .help("Import template file")
                 Button { showNewTemplateSheet = true } label: {
@@ -101,6 +105,7 @@ struct TemplateListView: View {
                         .foregroundStyle(.packitTeal)
                 }
                 .buttonStyle(.plain)
+                .focusable(false)
                 .help("New template (⌘N)")
             }
             .padding(.horizontal, 12)
@@ -156,6 +161,7 @@ struct TemplateListView: View {
 
 struct TemplateRow: View {
     let template: PackingTemplate
+    var isReceivedShare: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -167,6 +173,9 @@ struct TemplateRow: View {
                 }
                 Text(template.name)
                     .font(.system(.body, weight: .semibold))
+                if isReceivedShare {
+                    SharedBadge(author: template.createdBy, compact: true)
+                }
                 Spacer()
                 Text(templateSummary)
                     .font(.caption)

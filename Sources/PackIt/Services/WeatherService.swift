@@ -82,18 +82,33 @@ actor WeatherService {
 
     /// Fetch forecast using the configured provider with automatic historical fallback.
     func fetchForecast(latitude: Double, longitude: Double, startDate: Date, endDate: Date, config: LocalConfig) async throws -> [DailyForecast] {
-        let daysOut = Calendar.current.dateComponents([.day], from: .now, to: startDate).day ?? 0
+        let cal = Calendar.current
+        let daysOutStart = cal.dateComponents([.day], from: .now, to: startDate).day ?? 0
+        let daysOutEnd = cal.dateComponents([.day], from: .now, to: endDate).day ?? 0
         let maxDays: Int = switch config.weatherProvider {
         case .openMeteo: 15
         case .weatherApi: 13
         case .visualCrossing: 14
         }
 
-        if daysOut > maxDays {
-            // Beyond forecast range — use historical data from same dates last year
+        if daysOutStart > maxDays {
+            // Whole range beyond forecast window — use historical data from last year
             return try await fetchOpenMeteoHistorical(latitude: latitude, longitude: longitude, startDate: startDate, endDate: endDate)
         }
 
+        // Range straddles the forecast window: split into live + historical.
+        if daysOutEnd > maxDays {
+            let lastLiveDate = cal.date(byAdding: .day, value: maxDays, to: Calendar.current.startOfDay(for: .now))!
+            let firstHistoricalDate = cal.date(byAdding: .day, value: 1, to: lastLiveDate)!
+            async let live = fetchForecastInRange(latitude: latitude, longitude: longitude, startDate: startDate, endDate: lastLiveDate, config: config)
+            async let historical = fetchOpenMeteoHistorical(latitude: latitude, longitude: longitude, startDate: firstHistoricalDate, endDate: endDate)
+            return try await live + historical
+        }
+
+        return try await fetchForecastInRange(latitude: latitude, longitude: longitude, startDate: startDate, endDate: endDate, config: config)
+    }
+
+    private func fetchForecastInRange(latitude: Double, longitude: Double, startDate: Date, endDate: Date, config: LocalConfig) async throws -> [DailyForecast] {
         switch config.weatherProvider {
         case .openMeteo:
             return try await fetchOpenMeteo(latitude: latitude, longitude: longitude, startDate: startDate, endDate: endDate)

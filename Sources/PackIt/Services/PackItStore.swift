@@ -37,6 +37,7 @@ final class PackItStore {
 
     // Sharing & conflict
     var conflicts: [Conflict] = []
+    var newSharedItems: [NewSharedItem] = []
     private var knownVersions: [UUID: Int] = [:]
     private var refreshTimer: Timer?
 
@@ -90,6 +91,8 @@ final class PackItStore {
                 trips = newTrips
                 tags = try await persistence.loadTags()
                 snapshotVersions()
+                await performRefreshSharedState()
+                pollSharedFolder()
                 rebuildCaches()
             } catch {
                 // Silently ignore — next poll will retry
@@ -160,31 +163,112 @@ final class PackItStore {
     private(set) var _sharedTripIDs: Set<UUID> = []
 
     func refreshSharedState() {
-        Task {
-            _sharedTemplateIDs.removeAll()
-            _sharedTripIDs.removeAll()
-            for template in templates {
-                if await persistence.isShared(templateID: template.id) {
-                    _sharedTemplateIDs.insert(template.id)
-                }
+        Task { await performRefreshSharedState() }
+    }
+
+    private func performRefreshSharedState() async {
+        _sharedTemplateIDs.removeAll()
+        _sharedTripIDs.removeAll()
+        for template in templates {
+            if await persistence.isShared(templateID: template.id) {
+                _sharedTemplateIDs.insert(template.id)
             }
-            for trip in trips {
-                if await persistence.isShared(tripID: trip.id) {
-                    _sharedTripIDs.insert(trip.id)
-                }
+        }
+        for trip in trips {
+            if await persistence.isShared(tripID: trip.id) {
+                _sharedTripIDs.insert(trip.id)
             }
         }
     }
 
-    func shareTemplate(id: UUID) {
-        Task {
-            do {
-                try await persistence.shareTemplate(id: id)
-                _sharedTemplateIDs.insert(id)
-                loadAll()
-            } catch {
-                self.error = "Failed to share template: \(error.localizedDescription)"
+    // MARK: - Incoming shared detection
+
+    func pollSharedFolder() {
+        guard localConfig.hasSharedPath else { return }
+
+        // Bootstrap: on first run after this update, anchor the cutoff so
+        // historical shared items don't all fire at once. Badges still show.
+        if localConfig.lastSeenSharedAt == nil {
+            localConfig.lastSeenSharedAt = .now
+            localConfig.save()
+            return
+        }
+        guard let cutoff = localConfig.lastSeenSharedAt else { return }
+
+        let myName = currentUserName
+        var detected: [NewSharedItem] = []
+
+        for template in templates where _sharedTemplateIDs.contains(template.id) {
+            guard let author = template.createdBy, !author.isEmpty, author != myName else { continue }
+            if template.updatedAt > cutoff {
+                detected.append(NewSharedItem(id: template.id, name: template.name, kind: .template, author: author))
             }
+        }
+        for trip in trips where _sharedTripIDs.contains(trip.id) {
+            guard let author = trip.createdBy, !author.isEmpty, author != myName else { continue }
+            if trip.updatedAt > cutoff {
+                detected.append(NewSharedItem(id: trip.id, name: trip.name, kind: .trip, author: author))
+            }
+        }
+
+        guard !detected.isEmpty else { return }
+        let existing = Set(newSharedItems.map(\.id))
+        let fresh = detected.filter { !existing.contains($0.id) }
+        guard !fresh.isEmpty else { return }
+
+        newSharedItems.append(contentsOf: fresh)
+
+        let authors = Array(Set(fresh.map(\.author)))
+        let count = fresh.count
+        Task {
+            await notifications?.postIncomingShareNotification(count: count, authors: authors)
+        }
+    }
+
+    func acknowledgeNewShared() {
+        localConfig.lastSeenSharedAt = .now
+        localConfig.save()
+        newSharedItems.removeAll()
+    }
+
+    func isReceivedShare(templateID: UUID) -> Bool {
+        guard let template = templates.first(where: { $0.id == templateID }),
+              let author = template.createdBy, !author.isEmpty,
+              let me = currentUserName
+        else { return false }
+        return author != me
+    }
+
+    func isReceivedShare(tripID: UUID) -> Bool {
+        guard let trip = trips.first(where: { $0.id == tripID }),
+              let author = trip.createdBy, !author.isEmpty,
+              let me = currentUserName
+        else { return false }
+        return author != me
+    }
+
+    func shareTemplate(id: UUID) {
+        if let idx = templates.firstIndex(where: { $0.id == id }),
+           templates[idx].createdBy == nil,
+           let name = currentUserName {
+            templates[idx].createdBy = name
+            let stamped = templates[idx]
+            Task {
+                try? await persistence.saveTemplate(stamped)
+                await performShareTemplate(id: id)
+            }
+            return
+        }
+        Task { await performShareTemplate(id: id) }
+    }
+
+    private func performShareTemplate(id: UUID) async {
+        do {
+            try await persistence.shareTemplate(id: id)
+            _sharedTemplateIDs.insert(id)
+            loadAll()
+        } catch {
+            self.error = "Failed to share template: \(error.localizedDescription)"
         }
     }
 
@@ -201,15 +285,33 @@ final class PackItStore {
     }
 
     func shareTrip(id: UUID) {
-        Task {
-            do {
-                try await persistence.shareTrip(id: id)
-                _sharedTripIDs.insert(id)
-                loadAll()
-            } catch {
-                self.error = "Failed to share trip: \(error.localizedDescription)"
+        if let idx = trips.firstIndex(where: { $0.id == id }),
+           trips[idx].createdBy == nil,
+           let name = currentUserName {
+            trips[idx].createdBy = name
+            let stamped = trips[idx]
+            Task {
+                try? await persistence.saveTrip(stamped)
+                await performShareTrip(id: id)
             }
+            return
         }
+        Task { await performShareTrip(id: id) }
+    }
+
+    private func performShareTrip(id: UUID) async {
+        do {
+            try await persistence.shareTrip(id: id)
+            _sharedTripIDs.insert(id)
+            loadAll()
+        } catch {
+            self.error = "Failed to share trip: \(error.localizedDescription)"
+        }
+    }
+
+    private var currentUserName: String? {
+        let trimmed = localConfig.userName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     func unshareTrip(id: UUID) {
@@ -259,19 +361,86 @@ final class PackItStore {
     }
 
     var planningTrips: [TripInstance] {
-        trips.filter { $0.status == .planning }.sorted { $0.departureDate < $1.departureDate }
+        trips.filter { $0.status == .planning }.sorted(by: rankedAscending(secondary: { $0.departureDate < $1.departureDate }))
     }
 
     var activeTrips: [TripInstance] {
-        trips.filter { $0.status == .active }.sorted { $0.departureDate < $1.departureDate }
+        trips.filter { $0.status == .active }.sorted(by: rankedAscending(secondary: { $0.departureDate < $1.departureDate }))
     }
 
     var completedTrips: [TripInstance] {
-        trips.filter { $0.status == .completed }.sorted { $0.updatedAt > $1.updatedAt }
+        trips.filter { $0.status == .completed }.sorted(by: rankedAscending(secondary: { $0.updatedAt > $1.updatedAt }))
     }
 
     var archivedTrips: [TripInstance] {
-        trips.filter { $0.status == .archived }.sorted { $0.updatedAt > $1.updatedAt }
+        trips.filter { $0.status == .archived }.sorted(by: rankedAscending(secondary: { $0.updatedAt > $1.updatedAt }))
+    }
+
+    private func rankedAscending(secondary: @escaping (TripInstance, TripInstance) -> Bool) -> (TripInstance, TripInstance) -> Bool {
+        { a, b in
+            if a.rank != b.rank { return a.rank < b.rank }
+            return secondary(a, b)
+        }
+    }
+
+    func trips(for status: TripStatus) -> [TripInstance] {
+        switch status {
+        case .planning: return planningTrips
+        case .active: return activeTrips
+        case .completed: return completedTrips
+        case .archived: return archivedTrips
+        }
+    }
+
+    func reorderTrip(draggingID: UUID, before targetID: UUID, in status: TripStatus) {
+        guard draggingID != targetID else { return }
+        var ordered = trips(for: status)
+        guard let fromIdx = ordered.firstIndex(where: { $0.id == draggingID }),
+              let toIdx = ordered.firstIndex(where: { $0.id == targetID })
+        else { return }
+        let moved = ordered.remove(at: fromIdx)
+        let insertIdx = fromIdx < toIdx ? toIdx - 1 : toIdx
+        ordered.insert(moved, at: insertIdx)
+        assignRanks(ordered)
+    }
+
+    func reorderTripToEnd(draggingID: UUID, in status: TripStatus) {
+        var ordered = trips(for: status)
+        guard let fromIdx = ordered.firstIndex(where: { $0.id == draggingID }) else { return }
+        let moved = ordered.remove(at: fromIdx)
+        ordered.append(moved)
+        assignRanks(ordered)
+    }
+
+    private func assignRanks(_ ordered: [TripInstance]) {
+        var updated: [TripInstance] = []
+        for (i, var trip) in ordered.enumerated() where trip.rank != i {
+            trip.rank = i
+            if let idx = trips.firstIndex(where: { $0.id == trip.id }) {
+                trips[idx].rank = i
+            }
+            updated.append(trip)
+        }
+        for trip in updated {
+            Task { try? await persistence.saveTrip(trip) }
+        }
+    }
+
+    // MARK: - Last-selected trip per status
+
+    func lastSelectedTrip(for status: TripStatus) -> UUID? {
+        localConfig.lastSelectedTripByStatus?[status]
+    }
+
+    func rememberSelectedTrip(_ id: UUID?, for status: TripStatus) {
+        var dict = localConfig.lastSelectedTripByStatus ?? [:]
+        if let id {
+            dict[status] = id
+        } else {
+            dict.removeValue(forKey: status)
+        }
+        localConfig.lastSelectedTripByStatus = dict
+        localConfig.save()
     }
 
     var allTagNames: [String] {
@@ -342,7 +511,8 @@ final class PackItStore {
                 tags = try await persistence.loadTags()
                 _ = await notifications?.requestPermission()
                 snapshotVersions()
-                refreshSharedState()
+                await performRefreshSharedState()
+                pollSharedFolder()
             } catch {
                 self.error = error.localizedDescription
             }
@@ -385,7 +555,7 @@ final class PackItStore {
     // MARK: - Template CRUD
 
     func createTemplate(name: String, contextTags: [String]) {
-        var template = PackingTemplate(name: name, contextTags: contextTags)
+        var template = PackingTemplate(name: name, contextTags: contextTags, createdBy: currentUserName)
         template.touch()
         Task {
             do {
@@ -420,7 +590,8 @@ final class PackItStore {
         var copy = PackingTemplate(
             name: "\(source.name) Copy",
             items: source.items.map { TemplateItem(name: $0.name, category: $0.category, contextTags: $0.contextTags, priority: $0.priority, notes: $0.notes, quantity: $0.quantity) },
-            contextTags: source.contextTags
+            contextTags: source.contextTags,
+            createdBy: currentUserName
         )
         copy.touch()
         Task {
@@ -582,6 +753,7 @@ final class PackItStore {
             prepTasks: prepTasks,
             procedures: procedures,
             referenceLinks: refLinks,
+            createdBy: currentUserName,
             status: .planning
         )
 

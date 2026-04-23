@@ -21,7 +21,7 @@ struct OwnerField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            LeadingTextField(label: "Owner", text: $text, prompt: "e.g. Kim, Mark", isFocused: $isFocused)
+            LeadingTextField(label: "Owner", text: $text, prompt: "e.g. Alice, Bob", isFocused: $isFocused)
                 .onChange(of: text) { state.handleTextChange() }
                 .onChange(of: isFocused) {
                     if isFocused {

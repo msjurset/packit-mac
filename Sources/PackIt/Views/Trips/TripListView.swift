@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct TripListView: View {
     @Environment(PackItStore.self) private var store
     let trips: [TripInstance]
+    let status: TripStatus
     let title: String
     @Binding var showNewTripSheet: Bool
     var onCollapse: (() -> Void)?
@@ -11,6 +12,8 @@ struct TripListView: View {
     @State private var tripToDelete: TripInstance?
     @State private var showImporter = false
     @State private var exportingTrip: TripInstance?
+    @State private var dropTargetID: UUID?
+    @State private var draggingID: UUID?
 
     var body: some View {
         @Bindable var store = store
@@ -64,7 +67,7 @@ struct TripListView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         ForEach(trips) { trip in
-                            TripRow(trip: trip)
+                            TripRow(trip: trip, isReceivedShare: store.isReceivedShare(tripID: trip.id))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 2)
@@ -74,6 +77,38 @@ struct TripListView: View {
                                         : Color.primary.opacity(0.001)
                                 )
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .opacity(draggingID == trip.id ? 0.35 : 1)
+                                .padding(.top, dropTargetID == trip.id ? 10 : 0)
+                                .overlay(alignment: .top) {
+                                    if dropTargetID == trip.id {
+                                        Capsule()
+                                            .fill(Color.accentColor)
+                                            .frame(height: 3)
+                                            .padding(.horizontal, 6)
+                                            .transition(.opacity)
+                                    }
+                                }
+                                .animation(.easeInOut(duration: 0.15), value: dropTargetID)
+                                .animation(.easeInOut(duration: 0.15), value: draggingID)
+                                .draggable(trip.id.uuidString) {
+                                    TripRow(trip: trip, isReceivedShare: false)
+                                        .padding(8)
+                                        .background(.ultraThinMaterial)
+                                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                                        .onAppear { draggingID = trip.id }
+                                }
+                                .dropDestination(for: String.self) { items, _ in
+                                    defer { dropTargetID = nil; draggingID = nil }
+                                    guard let raw = items.first, let sourceID = UUID(uuidString: raw) else { return false }
+                                    store.reorderTrip(draggingID: sourceID, before: trip.id, in: status)
+                                    return true
+                                } isTargeted: { targeted in
+                                    if targeted {
+                                        dropTargetID = trip.id
+                                    } else if dropTargetID == trip.id {
+                                        dropTargetID = nil
+                                    }
+                                }
                                 .onTapGesture {
                                     if store.selectedTripID == trip.id {
                                         onCollapse?()
@@ -149,6 +184,7 @@ struct TripListView: View {
                         .foregroundStyle(.packitTeal)
                 }
                 .buttonStyle(.plain)
+                .focusable(false)
                 .help("New trip (⌘⇧N)")
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
@@ -160,6 +196,7 @@ struct TripListView: View {
                             .font(.caption)
                     }
                     .buttonStyle(.plain)
+                    .focusable(false)
                     .foregroundStyle(.secondary)
                     .help("Import trip file")
                     Button { showNewTripSheet = true } label: {
@@ -169,6 +206,7 @@ struct TripListView: View {
                             .fixedSize()
                     }
                     .buttonStyle(.plain)
+                    .focusable(false)
                     .foregroundStyle(.packitTeal)
                     .help("New trip (⌘⇧N)")
                 }
@@ -222,6 +260,7 @@ struct TripListView: View {
 
 struct TripRow: View {
     let trip: TripInstance
+    var isReceivedShare: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -229,6 +268,9 @@ struct TripRow: View {
                 TripIconView(icon: trip.icon, size: 26)
                 Text(trip.name)
                     .font(.headline)
+                if isReceivedShare {
+                    SharedBadge(author: trip.createdBy, compact: true)
+                }
                 Spacer()
                 Image(systemName: trip.status.icon)
                     .foregroundStyle(Color.statusColor(trip.status))

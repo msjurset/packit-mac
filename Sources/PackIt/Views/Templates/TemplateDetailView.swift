@@ -31,6 +31,10 @@ struct TemplateDetailView: View {
                             .foregroundStyle(.secondary)
                     }
 
+                    if store.isReceivedShare(templateID: template.id) {
+                        SharedBadge(author: template.createdBy)
+                    }
+
                     InlineTagEditor(
                         tags: template.contextTags,
                         isAddingTag: $isAddingTag,

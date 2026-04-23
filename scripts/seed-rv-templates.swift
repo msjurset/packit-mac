@@ -112,8 +112,8 @@ let pantry = template("Pantry & Groceries", items: [
     item("Tuna or chicken pouches", cat: "Dairy & Protein"), item("Jelly", cat: "Condiments"),
 ], tags: ["camping", "rv"])
 
-// 3. Cosmo's Stuff (dog)
-let cosmo = template("Cosmo's Stuff", items: [
+// 3. Dog's Stuff
+let cosmo = template("Dog's Stuff", items: [
     item("Bed, pillow, blankets, rug", cat: "Bedding"),
     item("Hammock and/or kennel", cat: "Containment"),
     item("Tie out, hook up", cat: "Containment"),
@@ -129,7 +129,7 @@ let cosmo = template("Cosmo's Stuff", items: [
     item("Brush, nail clipper, shampoo", cat: "Grooming"),
     item("Life jacket", cat: "Water", notes: "Depends on trip"),
 ], prepTasks: [
-    prep("Double check dog food/treats, meds, vaccines, wash Cosmo and blankets", cat: "Pets", timing: "weeksBefore"),
+    prep("Double check dog food/treats, meds, vaccines, wash dog and blankets", cat: "Pets", timing: "weeksBefore"),
 ], tags: ["pets"])
 
 // 4. Camp/Living
@@ -158,7 +158,7 @@ let bedBath = template("Bed & Bath", items: [
     item("Shower floor mat", cat: "Bathroom"),
     item("Hanging organizer", cat: "Bathroom"), item("Towels", cat: "Bath"),
     item("Shower shoes", cat: "Bath"), item("Mirror", cat: "Bath"),
-    item("Kim's hair towels", cat: "Bath"),
+    item("Hair towels", cat: "Bath"),
     item("Laundry kit: basket/bag, soap, tide stick, freshener spray, dryer sheets", cat: "Laundry"),
 ], tags: ["camping", "rv"])
 
@@ -222,8 +222,8 @@ let activities = template("Activities & Sports", items: [
     item("Sun hat, neck gator, hand gators, boat shoes, hair ties", cat: "Beach", tags: ["beach"]),
 ], tags: ["camping", "rv"])
 
-// 8. Clothes - Kim
-let clothesKim = template("Clothes - Kim", items: [
+// 8. Clothes - Alice
+let clothesAlice = template("Clothes - Alice", items: [
     item("PJs", cat: "Sleepwear"), item("Underwear, bras, socks", cat: "Undergarments"),
     item("Tank tops", cat: "Tops", notes: "1 dress, 3 day, 3-4 exercise"),
     item("T-shirts (short, long)", cat: "Tops", notes: "2 exercise, 4-5 day, 1 cozy"),
@@ -242,8 +242,8 @@ let clothesKim = template("Clothes - Kim", items: [
     item("Jewelry", cat: "Accessories"),
 ])
 
-// 9. Clothes - Mark
-let clothesMark = template("Clothes - Mark", items: [
+// 9. Clothes - Bob
+let clothesBob = template("Clothes - Bob", items: [
     item("PJs", cat: "Sleepwear"), item("Underwear, socks", cat: "Undergarments"),
     item("Tank tops", cat: "Tops"), item("T-shirts (short, long)", cat: "Tops"),
     item("Sweatshirts, sweaters", cat: "Layers"), item("Sweat pants, hiking pants", cat: "Bottoms"),
@@ -255,8 +255,8 @@ let clothesMark = template("Clothes - Mark", items: [
     item("Belt", cat: "Accessories"),
 ])
 
-// 10. Toiletries - Kim
-let toiletriesKim = template("Toiletries - Kim", items: [
+// 10. Toiletries - Alice
+let toiletriesAlice = template("Toiletries - Alice", items: [
     item("Toothpaste, brush, floss(ers)", cat: "Dental"), item("Face wash", cat: "Face"),
     item("Make up remover", cat: "Face"),
     item("Wash cloths, hair towels, loofa, face brush", cat: "Bath"),
@@ -283,13 +283,13 @@ let toiletriesKim = template("Toiletries - Kim", items: [
     item("Sunglasses and reading glasses, cleaners", cat: "Eyewear", priority: "high"),
 ])
 
-// 11. Toiletries - Mark
-let toiletriesMark = template("Toiletries - Mark", items: [
-    item("Meds", cat: "Medical"), item("Deodorant", cat: "Body"),
+// 11. Toiletries - Bob
+let toiletriesBob = template("Toiletries - Bob", items: [
+    item("Medications", cat: "Medical"), item("Deodorant", cat: "Body"),
     item("Lotion", cat: "Body"), item("Nail clipper", cat: "Body"),
     item("Face wash", cat: "Face"), item("Lip balm", cat: "Body"),
-    item("Body wash", cat: "Body"), item("Vertigo stuff", cat: "Medical"),
-    item("Toothpaste, floss, brush", cat: "Dental"), item("Zertec", cat: "Medical"),
+    item("Body wash", cat: "Body"), item("Allergy meds", cat: "Medical"),
+    item("Toothpaste, floss, brush", cat: "Dental"),
     item("Razors, trimmer", cat: "Body"), item("Vitamins", cat: "Medical"),
 ])
 
@@ -307,8 +307,8 @@ let firstAid = template("First Aid & NQR Kit", items: [
     item("Alcohol wipes, rubbing alcohol", cat: "First Aid"),
     item("Band aids and wrap", cat: "First Aid"),
     item("Cold meds", cat: "Cold & Flu"),
-    item("K's pills: HRT, pepcid, pain cream, muscle relaxer, vitamins", cat: "Prescription"),
-    item("M's vitamins", cat: "Prescription"),
+    item("A's prescriptions and vitamins", cat: "Prescription"),
+    item("B's vitamins", cat: "Prescription"),
     item("Bug bite relief", cat: "Outdoor"), item("Sunburn", cat: "Outdoor"),
     item("Ear plugs", cat: "Sleep"), item("Sleep mask", cat: "Sleep"),
     item("Breathe right strips", cat: "Sleep"),
@@ -351,12 +351,12 @@ let rvPrepTasks = template("RV Trip Prep Tasks", items: [], prepTasks: [
 let summerRV = PackingTemplate(
     id: UUID(), name: "Summer RV Roadtrip",
     items: [], prepTasks: [],
-    linkedTemplateIDs: [kitchen.id, pantry.id, cosmo.id, campLiving.id, bedBath.id, rvAuto.id, activities.id, clothesKim.id, clothesMark.id, toiletriesKim.id, toiletriesMark.id, firstAid.id, rvPrepTasks.id],
+    linkedTemplateIDs: [kitchen.id, pantry.id, cosmo.id, campLiving.id, bedBath.id, rvAuto.id, activities.id, clothesAlice.id, clothesBob.id, toiletriesAlice.id, toiletriesBob.id, firstAid.id, rvPrepTasks.id],
     contextTags: ["rv", "camping", "road-trip", "summer"],
     createdAt: .now, updatedAt: .now
 )
 
-let allTemplates = [kitchen, pantry, cosmo, campLiving, bedBath, rvAuto, activities, clothesKim, clothesMark, toiletriesKim, toiletriesMark, firstAid, rvPrepTasks, summerRV]
+let allTemplates = [kitchen, pantry, cosmo, campLiving, bedBath, rvAuto, activities, clothesAlice, clothesBob, toiletriesAlice, toiletriesBob, firstAid, rvPrepTasks, summerRV]
 
 // MARK: - Tags
 

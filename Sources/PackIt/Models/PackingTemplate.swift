@@ -11,10 +11,11 @@ struct PackingTemplate: Codable, Identifiable, Hashable, Sendable {
     var contextTags: [String]
     var version: Int
     var lastModifiedBy: String?
+    var createdBy: String?
     var createdAt: Date
     var updatedAt: Date
 
-    init(id: UUID = UUID(), name: String, items: [TemplateItem] = [], prepTasks: [PrepTaskTemplate] = [], procedures: [ProcedureTemplate] = [], referenceLinks: [ReferenceLink] = [], linkedTemplateIDs: [UUID] = [], contextTags: [String] = [], version: Int = 1, lastModifiedBy: String? = nil, createdAt: Date = .now, updatedAt: Date = .now) {
+    init(id: UUID = UUID(), name: String, items: [TemplateItem] = [], prepTasks: [PrepTaskTemplate] = [], procedures: [ProcedureTemplate] = [], referenceLinks: [ReferenceLink] = [], linkedTemplateIDs: [UUID] = [], contextTags: [String] = [], version: Int = 1, lastModifiedBy: String? = nil, createdBy: String? = nil, createdAt: Date = .now, updatedAt: Date = .now) {
         self.id = id
         self.name = name
         self.items = items
@@ -25,6 +26,7 @@ struct PackingTemplate: Codable, Identifiable, Hashable, Sendable {
         self.contextTags = contextTags
         self.version = version
         self.lastModifiedBy = lastModifiedBy
+        self.createdBy = createdBy
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -41,6 +43,7 @@ struct PackingTemplate: Codable, Identifiable, Hashable, Sendable {
         contextTags = try container.decodeIfPresent([String].self, forKey: .contextTags) ?? []
         version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
         lastModifiedBy = try container.decodeIfPresent(String.self, forKey: .lastModifiedBy)
+        createdBy = try container.decodeIfPresent(String.self, forKey: .createdBy)
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? .now
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? .now
     }

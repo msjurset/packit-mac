@@ -11,13 +11,13 @@ struct ContentListView: View {
         case .templates, .templateDetail:
             TemplateListView(showNewTemplateSheet: $showNewTemplateSheet)
         case .tripsPlanning, .tripDetail:
-            TripListView(trips: store.planningTrips, title: "Planning", showNewTripSheet: $showNewTripSheet)
+            TripListView(trips: store.planningTrips, status: .planning, title: "Planning", showNewTripSheet: $showNewTripSheet)
         case .tripsActive:
-            TripListView(trips: store.activeTrips, title: "Active Trips", showNewTripSheet: $showNewTripSheet)
+            TripListView(trips: store.activeTrips, status: .active, title: "Active Trips", showNewTripSheet: $showNewTripSheet)
         case .tripsCompleted:
-            TripListView(trips: store.completedTrips, title: "Completed", showNewTripSheet: $showNewTripSheet)
+            TripListView(trips: store.completedTrips, status: .completed, title: "Completed", showNewTripSheet: $showNewTripSheet)
         case .tripsArchived:
-            TripListView(trips: store.archivedTrips, title: "Archived", showNewTripSheet: $showNewTripSheet)
+            TripListView(trips: store.archivedTrips, status: .archived, title: "Archived", showNewTripSheet: $showNewTripSheet)
         case .tags:
             TagManagerView()
         case .statistics:

@@ -175,7 +175,7 @@ struct WeatherWidget: View {
                 }
             } catch {
                 await MainActor.run {
-                    self.error = "Unable to load forecast"
+                    self.error = "Unable to load forecast: \(error.localizedDescription)"
                     isLoading = false
                 }
             }

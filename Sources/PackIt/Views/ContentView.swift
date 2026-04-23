@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct ContentView: View {
     @Environment(PackItStore.self) private var store
@@ -7,6 +8,7 @@ struct ContentView: View {
     @State private var showNewTemplateSheet = false
     @State private var showNewTripSheet = false
     @State private var showQuickSearch = false
+    @State private var showNewSharedSheet = false
     @State private var tripListWidth: CGFloat = 280
 
     var body: some View {
@@ -30,6 +32,12 @@ struct ContentView: View {
         .onChange(of: store.navigation) { oldVal, newVal in
             let oldSection = sidebarSection(oldVal)
             let newSection = sidebarSection(newVal)
+
+            // Remember the previously-selected trip for its section before leaving.
+            if let prevStatus = tripStatus(for: oldVal) {
+                store.rememberSelectedTrip(store.selectedTripID, for: prevStatus)
+            }
+
             if oldSection != newSection {
                 if newSection != "templates" {
                     store.selectedTemplateID = nil
@@ -42,6 +50,21 @@ struct ContentView: View {
                     store.selectedTagID = nil
                 }
                 columnVisibility = .all
+            }
+
+            // Auto-select for the new trip section.
+            if let newStatus = tripStatus(for: newVal) {
+                autoSelectTrip(for: newStatus)
+            }
+        }
+        .onChange(of: store.isLoading) { _, nowLoading in
+            if !nowLoading, let status = tripStatus(for: store.navigation) {
+                autoSelectTrip(for: status)
+            }
+        }
+        .onChange(of: store.selectedTripID) { _, newID in
+            if let status = tripStatus(for: store.navigation) {
+                store.rememberSelectedTrip(newID, for: status)
             }
         }
         .onOpenURL { url in
@@ -62,6 +85,17 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showQuickSearch) {
             SearchView()
+        }
+        .sheet(isPresented: $showNewSharedSheet) {
+            NewSharedItemsSheet()
+        }
+        .onChange(of: store.newSharedItems.count) { _, newCount in
+            if newCount > 0 && !showNewSharedSheet {
+                showNewSharedSheet = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            store.pollSharedFolder()
         }
         .keyboardShortcut("n", modifiers: .command) {
             showNewTemplateSheet = true
@@ -221,13 +255,13 @@ struct ContentView: View {
     private var tripListForCurrentSection: some View {
         switch store.navigation {
         case .tripsPlanning, .tripDetail:
-            TripListView(trips: store.planningTrips, title: "Planning", showNewTripSheet: $showNewTripSheet, onCollapse: collapseTripList, onExpand: expandTripList)
+            TripListView(trips: store.planningTrips, status: .planning, title: "Planning", showNewTripSheet: $showNewTripSheet, onCollapse: collapseTripList, onExpand: expandTripList)
         case .tripsActive:
-            TripListView(trips: store.activeTrips, title: "Active Trips", showNewTripSheet: $showNewTripSheet, onCollapse: collapseTripList, onExpand: expandTripList)
+            TripListView(trips: store.activeTrips, status: .active, title: "Active Trips", showNewTripSheet: $showNewTripSheet, onCollapse: collapseTripList, onExpand: expandTripList)
         case .tripsCompleted:
-            TripListView(trips: store.completedTrips, title: "Completed", showNewTripSheet: $showNewTripSheet, onCollapse: collapseTripList, onExpand: expandTripList)
+            TripListView(trips: store.completedTrips, status: .completed, title: "Completed", showNewTripSheet: $showNewTripSheet, onCollapse: collapseTripList, onExpand: expandTripList)
         case .tripsArchived:
-            TripListView(trips: store.archivedTrips, title: "Archived", showNewTripSheet: $showNewTripSheet, onCollapse: collapseTripList, onExpand: expandTripList)
+            TripListView(trips: store.archivedTrips, status: .archived, title: "Archived", showNewTripSheet: $showNewTripSheet, onCollapse: collapseTripList, onExpand: expandTripList)
         default:
             EmptyView()
         }
@@ -267,6 +301,29 @@ struct ContentView: View {
         } else {
             ContentUnavailableView("No Selection", systemImage: "tag", description: Text("Select a tag to see its usage."))
                 .accessibilityIdentifier("detail.empty.tag")
+        }
+    }
+
+    private func tripStatus(for item: NavigationItem?) -> TripStatus? {
+        switch item {
+        case .tripsPlanning: return .planning
+        case .tripsActive: return .active
+        case .tripsCompleted: return .completed
+        case .tripsArchived: return .archived
+        default: return nil
+        }
+    }
+
+    private func autoSelectTrip(for status: TripStatus) {
+        let list = store.trips(for: status)
+        guard !list.isEmpty else {
+            store.selectedTripID = nil
+            return
+        }
+        if let remembered = store.lastSelectedTrip(for: status), list.contains(where: { $0.id == remembered }) {
+            store.selectedTripID = remembered
+        } else if store.selectedTripID == nil || list.contains(where: { $0.id == store.selectedTripID }) == false {
+            store.selectedTripID = list.first?.id
         }
     }
 

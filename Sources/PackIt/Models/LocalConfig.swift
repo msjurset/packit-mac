@@ -72,6 +72,8 @@ struct LocalConfig: Codable, Equatable, Sendable {
     var weatherProvider: WeatherProvider = .openMeteo
     var weatherApiKey: String = ""
     var visualCrossingApiKey: String = ""
+    var lastSeenSharedAt: Date?
+    var lastSelectedTripByStatus: [TripStatus: UUID]?
 
     var hasSharedPath: Bool {
         !sharedDataPath.isEmpty

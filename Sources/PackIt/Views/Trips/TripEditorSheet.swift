@@ -10,7 +10,6 @@ struct TripEditorSheet: View {
     @State private var destination: TripDestination?
     @State private var departureDate: Date = .now
     @State private var returnDate: Date = .now
-    @State private var hasReturnDate = false
     @State private var scratchNotes: String = ""
     @State private var status: TripStatus = .planning
 
@@ -21,10 +20,22 @@ struct TripEditorSheet: View {
                     TripIconPicker(selection: $icon)
                     LeadingTextField(label: "Name", text: $name)
                 }
-                DatePicker("Departure", selection: $departureDate, displayedComponents: .date)
-                Toggle("Return Date", isOn: $hasReturnDate)
-                if hasReturnDate {
-                    DatePicker("Return", selection: $returnDate, displayedComponents: .date)
+                LabeledContent("Departure") {
+                    HStack(spacing: 6) {
+                        StepperDateField(selection: $departureDate)
+                            .onChange(of: departureDate) { _, newStart in
+                                if returnDate < newStart {
+                                    returnDate = Calendar.current.date(byAdding: .day, value: 7, to: newStart) ?? newStart
+                                }
+                            }
+                        CalendarPopoverButton(selection: $departureDate)
+                    }
+                }
+                LabeledContent("Return") {
+                    HStack(spacing: 6) {
+                        StepperDateField(selection: $returnDate, minDate: departureDate)
+                        CalendarPopoverButton(selection: $returnDate, minDate: departureDate)
+                    }
                 }
                 DestinationField(destination: $destination)
                 Picker("Status", selection: $status) {
@@ -51,8 +62,7 @@ struct TripEditorSheet: View {
             icon = trip.icon
             destination = trip.destination
             departureDate = trip.departureDate
-            returnDate = trip.returnDate ?? .now
-            hasReturnDate = trip.returnDate != nil
+            returnDate = trip.returnDate ?? Calendar.current.date(byAdding: .day, value: 7, to: trip.departureDate) ?? trip.departureDate
             scratchNotes = trip.scratchNotes
             status = trip.status
         }
@@ -64,7 +74,7 @@ struct TripEditorSheet: View {
         updated.icon = icon
         updated.destination = destination
         updated.departureDate = departureDate
-        updated.returnDate = hasReturnDate ? returnDate : nil
+        updated.returnDate = returnDate
         updated.scratchNotes = scratchNotes
         updated.status = status
         store.updateTrip(updated)

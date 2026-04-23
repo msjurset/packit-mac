@@ -8,7 +8,6 @@ struct NewTripSheet: View {
     @State private var icon: TripIcon = .suitcase
     @State private var departureDate = Date.now
     @State private var returnDate = Date.now.addingTimeInterval(7 * 86400)
-    @State private var hasReturnDate = true
     @State private var destination: TripDestination?
     @State private var selectedTemplateIDs: Set<UUID> = []
     @State private var selectedTags: Set<String> = []
@@ -20,10 +19,22 @@ struct NewTripSheet: View {
                     TripIconPicker(selection: $icon)
                     LeadingTextField(label: "Trip Name", text: $name)
                 }
-                DatePicker("Departure", selection: $departureDate, displayedComponents: .date)
-                Toggle("Return Date", isOn: $hasReturnDate)
-                if hasReturnDate {
-                    DatePicker("Return", selection: $returnDate, displayedComponents: .date)
+                LabeledContent("Departure") {
+                    HStack(spacing: 6) {
+                        StepperDateField(selection: $departureDate)
+                            .onChange(of: departureDate) { _, newStart in
+                                if returnDate < newStart {
+                                    returnDate = Calendar.current.date(byAdding: .day, value: 7, to: newStart) ?? newStart
+                                }
+                            }
+                        CalendarPopoverButton(selection: $departureDate)
+                    }
+                }
+                LabeledContent("Return") {
+                    HStack(spacing: 6) {
+                        StepperDateField(selection: $returnDate, minDate: departureDate)
+                        CalendarPopoverButton(selection: $returnDate, minDate: departureDate)
+                    }
                 }
                 DestinationField(destination: $destination)
             }
@@ -100,7 +111,7 @@ struct NewTripSheet: View {
             icon: icon,
             destination: destination,
             departureDate: departureDate,
-            returnDate: hasReturnDate ? returnDate : nil,
+            returnDate: returnDate,
             templateIDs: Array(selectedTemplateIDs),
             selectedTags: Array(selectedTags)
         )

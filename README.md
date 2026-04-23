@@ -77,6 +77,8 @@ A macOS app for managing reusable packing list templates, trip-specific checklis
 - Background polling (45s) detects changes from other users
 - Conflict detection with notification banners
 - Version tracking and last-modified-by stamps
+- "Shared by &lt;name&gt;" badge on templates and trips someone else shared with you
+- In-app modal plus macOS notification the first time a new shared item shows up
 
 ### Print
 - Three layout modes: Standard (columns), Compact (category boxes), Dense (maximum density)

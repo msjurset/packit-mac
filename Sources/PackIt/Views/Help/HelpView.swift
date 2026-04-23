@@ -759,6 +759,18 @@ enum HelpTopic: String, CaseIterable, Identifiable {
 
                 Shared items display a **person badge** in the sidebar list. You can unshare at any time by right-clicking and choosing **Stop Sharing**. Unsharing removes the item from the shared folder but keeps your local copy intact.
                 """),
+                HelpSection(title: "Incoming Shares & Notifications", body: """
+                When someone else adds a new template or trip to your shared folder, PackIt lets you know:
+
+                - A modal appears the next time you open or focus the app, listing the new items and who shared them
+                - A macOS notification is posted at the same time, so you don't miss it if the window is closed
+                - The template or trip shows a **"Shared by Name"** badge in the list and on its detail header — this stays visible even after you dismiss the modal, so you can always tell received-from-someone-else resources apart from your own
+
+                Set your name in **Settings → Sharing → Your Name** so your shared items carry the right attribution; without a name set, PackIt can't tell "from you" apart from "from someone else."
+                """, tips: [
+                    "The modal only fires once per new item — click 'Got it' and PackIt won't nag you again about the same share",
+                    "Badges are permanent by design: even weeks later you'll still see which templates came from whom",
+                ]),
             ]
 
         case .compositeTemplates:

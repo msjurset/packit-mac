@@ -56,6 +56,27 @@ actor NotificationService {
         try? await center.add(request)
     }
 
+    func postIncomingShareNotification(count: Int, authors: [String]) async {
+        let content = UNMutableNotificationContent()
+        let sortedAuthors = authors.sorted()
+        if count == 1, let author = sortedAuthors.first {
+            content.title = "PackIt: New from \(author)"
+            content.body = "Open PackIt to see what was shared with you."
+        } else if sortedAuthors.count == 1, let author = sortedAuthors.first {
+            content.title = "PackIt: \(count) new items from \(author)"
+            content.body = "Open PackIt to see them."
+        } else {
+            content.title = "PackIt: \(count) new shared items"
+            let joined = sortedAuthors.joined(separator: ", ")
+            content.body = "Shared by \(joined). Open PackIt to see them."
+        }
+        content.sound = .default
+
+        let id = "packit-incoming-share-\(UUID().uuidString)"
+        let request = UNNotificationRequest(identifier: id, content: content, trigger: nil)
+        try? await center.add(request)
+    }
+
     // MARK: - Cancellation
 
     func cancelDepartureReminder(tripID: UUID) async {

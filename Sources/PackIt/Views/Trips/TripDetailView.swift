@@ -188,8 +188,13 @@ struct TripDetailView: View {
                 HStack(spacing: 10) {
                     TripIconView(icon: trip.icon, size: 32)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(trip.name)
-                            .font(.title3.bold())
+                        HStack(spacing: 8) {
+                            Text(trip.name)
+                                .font(.title3.bold())
+                            if store.isReceivedShare(tripID: trip.id) {
+                                SharedBadge(author: trip.createdBy)
+                            }
+                        }
                         Text(trip.status.label)
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -654,7 +659,9 @@ struct TripInspectorView: View {
 
                             Spacer()
 
-                            PriorityBadge(priority: todo.priority)
+                            if !todo.isComplete {
+                                PriorityBadge(priority: todo.priority)
+                            }
                         }
                         .padding(.vertical, 4)
                         .contextMenu {

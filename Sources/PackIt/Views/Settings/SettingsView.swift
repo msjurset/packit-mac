@@ -27,7 +27,7 @@ struct SettingsView: View {
                 HStack {
                     Text("Your Name")
                     Spacer()
-                    TextField("e.g. Mark", text: Binding(
+                    TextField("e.g. Bob", text: Binding(
                         get: { store.localConfig.userName },
                         set: {
                             store.localConfig.userName = $0

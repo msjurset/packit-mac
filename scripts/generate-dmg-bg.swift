@@ -8,9 +8,9 @@ let size = NSSize(width: width, height: height)
 let image = NSImage(size: size)
 image.lockFocus()
 
-// Background gradient
-let gradient = NSGradient(starting: NSColor(red: 0.12, green: 0.12, blue: 0.14, alpha: 1.0),
-                          ending: NSColor(red: 0.08, green: 0.08, blue: 0.10, alpha: 1.0))!
+// Background gradient — medium tone that works with both light and dark icon labels
+let gradient = NSGradient(starting: NSColor(red: 0.22, green: 0.23, blue: 0.26, alpha: 1.0),
+                          ending: NSColor(red: 0.16, green: 0.17, blue: 0.20, alpha: 1.0))!
 gradient.draw(in: NSRect(origin: .zero, size: size), angle: 270)
 
 // Arrow
@@ -24,7 +24,7 @@ arrowPath.move(to: NSPoint(x: arrowLeft, y: arrowY))
 arrowPath.line(to: NSPoint(x: arrowRight - 30, y: arrowY))
 arrowPath.lineWidth = 3
 
-NSColor(red: 0.4, green: 0.6, blue: 0.9, alpha: 0.6).setStroke()
+NSColor(red: 0.5, green: 0.72, blue: 1.0, alpha: 0.7).setStroke()
 arrowPath.stroke()
 
 // Arrowhead
@@ -43,7 +43,7 @@ paragraphStyle.alignment = .center
 
 let textAttrs: [NSAttributedString.Key: Any] = [
     .font: NSFont.systemFont(ofSize: 15, weight: .medium),
-    .foregroundColor: NSColor(red: 0.4, green: 0.6, blue: 0.9, alpha: 0.8),
+    .foregroundColor: NSColor(red: 0.6, green: 0.78, blue: 1.0, alpha: 0.9),
     .paragraphStyle: paragraphStyle
 ]
 let text = "Drag PackIt to Applications" as NSString
