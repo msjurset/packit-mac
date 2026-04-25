@@ -575,10 +575,21 @@ final class PackItStore {
         }
         var updated = template
         updated.touch(by: localConfig.userName.isEmpty ? nil : localConfig.userName)
+
+        // Mutate in-memory state synchronously so the UI updates immediately.
+        if let idx = templates.firstIndex(where: { $0.id == updated.id }) {
+            templates[idx] = updated
+        } else {
+            templates.append(updated)
+        }
+        templates.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        knownVersions[updated.id] = updated.version
+        rebuildCaches()
+
+        // Persist asynchronously without re-loading.
         Task {
             do {
                 try await persistence.saveTemplate(updated)
-                loadAll()
             } catch {
                 self.error = error.localizedDescription
             }
@@ -676,7 +687,7 @@ final class PackItStore {
         return resolved
     }
 
-    func createTrip(name: String, icon: TripIcon = .suitcase, destination: TripDestination? = nil, departureDate: Date, returnDate: Date?, templateIDs: [UUID], selectedTags: [String]) -> TripInstance {
+    func createTrip(name: String, icon: TripIcon = .suitcase, destination: TripDestination? = nil, departureDate: Date, returnDate: Date?, templateIDs: [UUID], selectedTags: [String], members: [String] = []) -> TripInstance {
         let sourceTemplates = resolveTemplates(ids: templateIDs)
         var items: [TripItem] = []
         var seenNames = Set<String>()
@@ -754,6 +765,7 @@ final class PackItStore {
             procedures: procedures,
             referenceLinks: refLinks,
             createdBy: currentUserName,
+            members: members,
             status: .planning
         )
 
@@ -779,11 +791,111 @@ final class PackItStore {
         }
         var updated = trip
         updated.touch(by: localConfig.userName.isEmpty ? nil : localConfig.userName)
+
+        // Mutate in-memory state synchronously so the UI updates immediately and
+        // any chained subsequent updates (e.g. bulk edits) operate on fresh state.
+        if let idx = trips.firstIndex(where: { $0.id == updated.id }) {
+            trips[idx] = updated
+        } else {
+            trips.append(updated)
+        }
+        knownVersions[updated.id] = updated.version
+        rebuildCaches()
+
+        // Persist asynchronously without re-loading; the in-memory state is authoritative.
         Task {
             do {
                 try await persistence.saveTrip(updated)
                 await notifications?.syncReminders(trip: updated)
+            } catch {
+                self.error = error.localizedDescription
+            }
+        }
+    }
+
+    func duplicateTrip(id: UUID) {
+        guard let source = trips.first(where: { $0.id == id }) else { return }
+
+        let copiedItems = source.items.map { item -> TripItem in
+            var c = item
+            c.id = UUID()
+            c.isPacked = false
+            return c
+        }
+        let copiedPrepTasks = source.prepTasks.map { task -> PrepTask in
+            var c = task
+            c.id = UUID()
+            c.isComplete = false
+            return c
+        }
+        let copiedTodos = source.todos.map { todo -> TripTodo in
+            var c = todo
+            c.id = UUID()
+            c.isComplete = false
+            return c
+        }
+        let copiedActivities = source.activities.map { a -> TripActivity in
+            var c = a
+            c.id = UUID()
+            return c
+        }
+        let copiedProcedures = source.procedures.map { proc -> Procedure in
+            var c = proc
+            c.id = UUID()
+            c.steps = proc.steps.map { step in
+                var s = step
+                s.id = UUID()
+                s.isComplete = false
+                return s
+            }
+            return c
+        }
+        let copiedMealPlan: MealPlan? = source.mealPlan.map { mp in
+            var newMP = mp
+            newMP.days = mp.days.map { day in
+                var nd = day
+                nd.id = UUID()
+                nd.breakfast.id = UUID()
+                nd.lunch.id = UUID()
+                nd.dinner.id = UUID()
+                nd.snacks.id = UUID()
+                nd.beverages.id = UUID()
+                return nd
+            }
+            return newMP
+        }
+        let copiedLinks = source.referenceLinks.map { link -> ReferenceLink in
+            var c = link
+            c.id = UUID()
+            return c
+        }
+
+        let copy = TripInstance(
+            name: "\(source.name) Copy",
+            icon: source.icon,
+            destination: source.destination,
+            sourceTemplateIDs: source.sourceTemplateIDs,
+            departureDate: source.departureDate,
+            returnDate: source.returnDate,
+            items: copiedItems,
+            prepTasks: copiedPrepTasks,
+            todos: copiedTodos,
+            activities: copiedActivities,
+            procedures: copiedProcedures,
+            mealPlan: copiedMealPlan,
+            referenceLinks: copiedLinks,
+            createdBy: currentUserName,
+            members: source.members,
+            scratchNotes: source.scratchNotes,
+            status: .planning
+        )
+
+        Task {
+            do {
+                try await persistence.saveTrip(copy)
                 loadAll()
+                selectedTripID = copy.id
+                navigation = .tripDetail(copy.id)
             } catch {
                 self.error = error.localizedDescription
             }
@@ -830,13 +942,28 @@ final class PackItStore {
               let sourceIdx = trip.items.firstIndex(where: { $0.id == itemID }),
               let targetIdx = trip.items.firstIndex(where: { $0.id == targetID }),
               sourceIdx != targetIdx else { return }
-        let sourceCategory = trip.items[sourceIdx].category ?? "Uncategorized"
-        let targetCategory = trip.items[targetIdx].category ?? "Uncategorized"
-        guard sourceCategory == targetCategory else { return }
-        let item = trip.items.remove(at: sourceIdx)
+        let sourceCategory = trip.items[sourceIdx].category
+        let targetCategory = trip.items[targetIdx].category
+        var item = trip.items.remove(at: sourceIdx)
+        if sourceCategory != targetCategory {
+            item.category = targetCategory
+        }
         let newTarget = trip.items.firstIndex(where: { $0.id == targetID }) ?? trip.items.endIndex
         trip.items.insert(item, at: newTarget)
-        updateTrip(trip, actionName: "Reorder Items")
+        let actionName = sourceCategory == targetCategory ? "Reorder Items" : "Move to \(targetCategory ?? "Uncategorized")"
+        updateTrip(trip, actionName: actionName)
+    }
+
+    func moveTripItem(in tripID: UUID, itemID: UUID, toCategory newCategory: String?) {
+        guard var trip = trips.first(where: { $0.id == tripID }),
+              let sourceIdx = trip.items.firstIndex(where: { $0.id == itemID }) else { return }
+        var item = trip.items.remove(at: sourceIdx)
+        item.category = newCategory
+        // Append after the last item in the destination category, or at end if none.
+        let lastInTarget = trip.items.lastIndex(where: { $0.category == newCategory })
+        let insertIdx = lastInTarget.map { $0 + 1 } ?? trip.items.endIndex
+        trip.items.insert(item, at: insertIdx)
+        updateTrip(trip, actionName: "Move to \(newCategory ?? "Uncategorized")")
     }
 
     // MARK: - Trip Item Operations
@@ -859,17 +986,119 @@ final class PackItStore {
         updateTrip(trip, actionName: wasPacked ? "Unpack Item" : "Pack Item")
     }
 
-    func addAdHocItem(to tripID: UUID, name: String, category: String?, priority: Priority, quantity: Int = 1) {
+    func addAdHocItem(to tripID: UUID, name: String, category: String?, priority: Priority, quantity: Int = 1, owner: String? = nil) {
         guard var trip = trips.first(where: { $0.id == tripID }) else { return }
-        let item = TripItem(name: name, category: category, priority: priority, isAdHoc: true, quantity: quantity)
+        let item = TripItem(name: name, category: category, owner: owner, priority: priority, isAdHoc: true, quantity: quantity)
         trip.items.append(item)
         updateTrip(trip, actionName: "Add Item")
+    }
+
+    func updateTripItem(in tripID: UUID, item: TripItem) {
+        guard var trip = trips.first(where: { $0.id == tripID }),
+              let idx = trip.items.firstIndex(where: { $0.id == item.id }) else { return }
+        trip.items[idx] = item
+        updateTrip(trip, actionName: "Edit Item")
+    }
+
+    /// Apply an item edit and create per-owner duplicates in a single transaction.
+    /// `additionalOwners` are inserted as copies right after the edited item.
+    func applyItemEdit(in tripID: UUID, item updated: TripItem, additionalOwners: [String]) {
+        guard var trip = trips.first(where: { $0.id == tripID }),
+              let idx = trip.items.firstIndex(where: { $0.id == updated.id }) else { return }
+        trip.items[idx] = updated
+        var insertIdx = idx + 1
+        for owner in additionalOwners {
+            var copy = updated
+            copy.id = UUID()
+            copy.owner = owner
+            copy.isPacked = false
+            trip.items.insert(copy, at: insertIdx)
+            insertIdx += 1
+        }
+        updateTrip(trip, actionName: "Edit Item")
+    }
+
+    /// Reassign owner on many items in a single transaction.
+    func bulkSetOwner(in tripID: UUID, itemIDs: Set<UUID>, owner: String?) {
+        guard var trip = trips.first(where: { $0.id == tripID }) else { return }
+        var changed = false
+        for i in trip.items.indices where itemIDs.contains(trip.items[i].id) {
+            trip.items[i].owner = owner
+            changed = true
+        }
+        guard changed else { return }
+        updateTrip(trip, actionName: "Set Owner")
+    }
+
+    /// Duplicate many items at once, each with the same target owner.
+    func bulkDuplicate(in tripID: UUID, itemIDs: Set<UUID>, newOwner: String?) {
+        guard var trip = trips.first(where: { $0.id == tripID }) else { return }
+        let originals = trip.items.enumerated().filter { itemIDs.contains($0.element.id) }
+        guard !originals.isEmpty else { return }
+        // Walk in descending index so insertions don't disturb earlier indices.
+        for (idx, source) in originals.reversed() {
+            var copy = source
+            copy.id = UUID()
+            copy.owner = newOwner
+            copy.isPacked = false
+            trip.items.insert(copy, at: idx + 1)
+        }
+        updateTrip(trip, actionName: "Duplicate Items")
+    }
+
+    func duplicateTripItem(in tripID: UUID, itemID: UUID, newOwner: String?) {
+        guard var trip = trips.first(where: { $0.id == tripID }),
+              let source = trip.items.first(where: { $0.id == itemID }) else { return }
+        var copy = source
+        copy.id = UUID()
+        copy.owner = newOwner
+        copy.isPacked = false
+        if let idx = trip.items.firstIndex(where: { $0.id == itemID }) {
+            trip.items.insert(copy, at: idx + 1)
+        } else {
+            trip.items.append(copy)
+        }
+        updateTrip(trip, actionName: "Duplicate Item")
     }
 
     func removeItem(from tripID: UUID, itemID: UUID) {
         guard var trip = trips.first(where: { $0.id == tripID }) else { return }
         trip.items.removeAll { $0.id == itemID }
         updateTrip(trip, actionName: "Remove Item")
+    }
+
+    /// Remove items, prep tasks, procedures, and reference links from a trip in a single
+    /// atomic update. Required because chained per-id remove calls each schedule their
+    /// own async write and read stale `self.trips`, causing only the last to take effect.
+    func bulkRemoveFromTrip(_ tripID: UUID,
+                            itemIDs: Set<UUID> = [],
+                            prepTaskIDs: Set<UUID> = [],
+                            procedureIDs: Set<UUID> = [],
+                            referenceLinkIDs: Set<UUID> = []) {
+        guard var trip = trips.first(where: { $0.id == tripID }) else { return }
+        var changed = false
+        if !itemIDs.isEmpty {
+            let before = trip.items.count
+            trip.items.removeAll { itemIDs.contains($0.id) }
+            changed = changed || trip.items.count != before
+        }
+        if !prepTaskIDs.isEmpty {
+            let before = trip.prepTasks.count
+            trip.prepTasks.removeAll { prepTaskIDs.contains($0.id) }
+            changed = changed || trip.prepTasks.count != before
+        }
+        if !procedureIDs.isEmpty {
+            let before = trip.procedures.count
+            trip.procedures.removeAll { procedureIDs.contains($0.id) }
+            changed = changed || trip.procedures.count != before
+        }
+        if !referenceLinkIDs.isEmpty {
+            let before = trip.referenceLinks.count
+            trip.referenceLinks.removeAll { referenceLinkIDs.contains($0.id) }
+            changed = changed || trip.referenceLinks.count != before
+        }
+        guard changed else { return }
+        updateTrip(trip, actionName: "Remove Items")
     }
 
     func removeItems(from tripID: UUID, itemIDs: Set<UUID>) {
@@ -883,6 +1112,17 @@ final class PackItStore {
               let idx = trip.items.firstIndex(where: { $0.id == itemID }) else { return }
         trip.items[idx].category = newCategory
         updateTrip(trip, actionName: "Recategorize Item")
+    }
+
+    func renameCategory(in tripID: UUID, from oldCategory: String?, to newCategory: String) {
+        guard var trip = trips.first(where: { $0.id == tripID }) else { return }
+        var changed = false
+        for i in trip.items.indices where trip.items[i].category == oldCategory {
+            trip.items[i].category = newCategory
+            changed = true
+        }
+        guard changed else { return }
+        updateTrip(trip, actionName: "Rename Category")
     }
 
     // MARK: - Trip Todo Operations

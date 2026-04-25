@@ -52,8 +52,19 @@ struct ContentView: View {
                 columnVisibility = .all
             }
 
+            // Auto-expand the trip list whenever the trip section changes
+            // (planning ↔ active ↔ completed ↔ archived). Predictable and
+            // also avoids the crushed empty-state rendering when the new
+            // section has no trips.
+            let oldStatus = tripStatus(for: oldVal)
+            let newStatus = tripStatus(for: newVal)
+            if let newStatus, oldStatus != newStatus {
+                store.tripListCompact = false
+                tripListWidth = 280
+            }
+
             // Auto-select for the new trip section.
-            if let newStatus = tripStatus(for: newVal) {
+            if let newStatus {
                 autoSelectTrip(for: newStatus)
             }
         }
@@ -317,6 +328,11 @@ struct ContentView: View {
     private func autoSelectTrip(for status: TripStatus) {
         let list = store.trips(for: status)
         guard !list.isEmpty else {
+            // Empty section: force the list column to expand so the "No trips"
+            // empty state renders properly. The compact strip would otherwise
+            // render the CUV as a 54-pt vertical sliver.
+            store.tripListCompact = false
+            tripListWidth = 280
             store.selectedTripID = nil
             return
         }

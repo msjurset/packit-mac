@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 enum AppAppearance: String, Codable, CaseIterable, Sendable {
     case system
@@ -10,6 +11,34 @@ enum AppAppearance: String, Codable, CaseIterable, Sendable {
         case .system: "System"
         case .dark: "Dark"
         case .light: "Light"
+        }
+    }
+}
+
+enum AppFontSize: String, Codable, CaseIterable, Sendable {
+    case small
+    case medium
+    case large
+    case xLarge = "xlarge"
+    case xxLarge = "xxlarge"
+
+    var label: String {
+        switch self {
+        case .small: "Smaller"
+        case .medium: "Default"
+        case .large: "Larger"
+        case .xLarge: "Extra Large"
+        case .xxLarge: "Largest"
+        }
+    }
+
+    var dynamicTypeSize: DynamicTypeSize {
+        switch self {
+        case .small: .small
+        case .medium: .large            // SwiftUI's default
+        case .large: .xxxLarge
+        case .xLarge: .accessibility2
+        case .xxLarge: .accessibility4
         }
     }
 }
@@ -65,6 +94,7 @@ enum WeatherProvider: String, Codable, CaseIterable, Sendable {
 
 struct LocalConfig: Codable, Equatable, Sendable {
     var appearance: AppAppearance = .system
+    var fontSize: AppFontSize?
     var launchView: LaunchView = .templates
     var lastNavigationKey: String = "templates"
     var userName: String = ""

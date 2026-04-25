@@ -32,7 +32,8 @@ struct TemplateListView: View {
                         ForEach(Array(store.filteredTemplates.enumerated()), id: \.element.id) { index, template in
                             TemplateRow(
                                 template: template,
-                                isReceivedShare: store.isReceivedShare(templateID: template.id)
+                                isReceivedShare: store.isReceivedShare(templateID: template.id),
+                                isSharingOut: store._sharedTemplateIDs.contains(template.id)
                             )
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 10)
@@ -162,6 +163,7 @@ struct TemplateListView: View {
 struct TemplateRow: View {
     let template: PackingTemplate
     var isReceivedShare: Bool = false
+    var isSharingOut: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -175,6 +177,8 @@ struct TemplateRow: View {
                     .font(.system(.body, weight: .semibold))
                 if isReceivedShare {
                     SharedBadge(author: template.createdBy, compact: true)
+                } else if isSharingOut {
+                    SharingOutBadge(compact: true)
                 }
                 Spacer()
                 Text(templateSummary)

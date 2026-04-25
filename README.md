@@ -23,10 +23,31 @@ A macOS app for managing reusable packing list templates, trip-specific checklis
 - Add ad-hoc items during a trip (marked with "new" badge)
 - Merge ad-hoc items back into templates after the trip
 - Import additional templates into existing trips with dedup
-- Trip icons (16 themed options: beach, mountain, city, camping, etc.)
+- Trip icons (48 themed options: beach, mountain, city, camping, surfing, sailing, biking, RV, …) with searchable picker and keyboard navigation (arrows / hjkl / Enter)
 - Destination with geocoding search
 - Trip statuses: Planning, Active, Completed, Archived
 - Fullscreen detail mode
+- Drag-to-reorder trips within each section
+- Auto-select last viewed trip per section when navigating
+- Duplicate a trip (deep copy with reset packed/complete state, status reset to Planning)
+
+### Members & Item Ownership
+- Define members per trip (e.g. you + Kim) with chip-style add/remove
+- Assign trip items to one or more members; items with no owner are shared
+- Member filter checkboxes at the top of the packing list — show only the members you care about (shared items always visible)
+- Owner suffix on item rows when filter shows multiple members
+- Edit-item sheet supports multi-owner selection — saving creates per-owner duplicates automatically
+- Right-click any item: Owner submenu (reassign in place), Duplicate For submenu (clone for another owner), or apply to a multi-selection
+
+### List interactions
+- Multi-select packing items with Cmd-click (toggle) and Shift-click (range)
+- Floating bulk action bar: Owner, Duplicate For, Remove
+- Right-click on a row in a multi-selection applies the action to the entire selection
+- Plain click anywhere clears the selection
+- Double-click a row to open the Edit sheet
+- Press `/` to find in list — text search with N / spacebar / arrow buttons to advance, Esc to close
+- Drag items into another category to recategorize; double-click a category header to rename
+- Drag-drop indicators with row-parting animation
 
 ### Prep Tasks
 - 6-tier timing: Early (-21d), 2 Weeks (-14d), 1 Week (-7d), Day Before (-1d), Day Of, On Return
@@ -78,6 +99,7 @@ A macOS app for managing reusable packing list templates, trip-specific checklis
 - Conflict detection with notification banners
 - Version tracking and last-modified-by stamps
 - "Shared by &lt;name&gt;" badge on templates and trips someone else shared with you
+- "Shared" badge on templates and trips you're sharing out
 - In-app modal plus macOS notification the first time a new shared item shows up
 
 ### Print

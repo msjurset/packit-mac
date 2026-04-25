@@ -67,7 +67,11 @@ struct TripListView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         ForEach(trips) { trip in
-                            TripRow(trip: trip, isReceivedShare: store.isReceivedShare(tripID: trip.id))
+                            TripRow(
+                                trip: trip,
+                                isReceivedShare: store.isReceivedShare(tripID: trip.id),
+                                isSharingOut: store._sharedTripIDs.contains(trip.id)
+                            )
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 2)
@@ -145,6 +149,11 @@ struct TripListView: View {
                                         } label: {
                                             Label("Archive", systemImage: "archivebox")
                                         }
+                                    }
+                                    Button {
+                                        store.duplicateTrip(id: trip.id)
+                                    } label: {
+                                        Label("Duplicate", systemImage: "doc.on.doc")
                                     }
                                     Button {
                                         exportingTrip = trip
@@ -261,6 +270,7 @@ struct TripListView: View {
 struct TripRow: View {
     let trip: TripInstance
     var isReceivedShare: Bool = false
+    var isSharingOut: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -270,6 +280,8 @@ struct TripRow: View {
                     .font(.headline)
                 if isReceivedShare {
                     SharedBadge(author: trip.createdBy, compact: true)
+                } else if isSharingOut {
+                    SharingOutBadge(compact: true)
                 }
                 Spacer()
                 Image(systemName: trip.status.icon)

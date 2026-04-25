@@ -11,6 +11,8 @@ struct NewTripSheet: View {
     @State private var destination: TripDestination?
     @State private var selectedTemplateIDs: Set<UUID> = []
     @State private var selectedTags: Set<String> = []
+    @State private var members: [String] = []
+    @State private var didSeedMembers = false
 
     var body: some View {
         FormSheet(width: 550, height: 600) {
@@ -37,6 +39,13 @@ struct NewTripSheet: View {
                     }
                 }
                 DestinationField(destination: $destination)
+            }
+
+            Section("Members") {
+                Text("Each member can own packing items. Items with no owner are shared.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                MemberListEditor(members: $members)
             }
 
             Section("Start from Templates") {
@@ -94,6 +103,13 @@ struct NewTripSheet: View {
                 .keyboardShortcut(.defaultAction)
                 .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
         }
+        .onAppear {
+            if !didSeedMembers {
+                let me = store.localConfig.userName.trimmingCharacters(in: .whitespaces)
+                if !me.isEmpty { members = [me] }
+                didSeedMembers = true
+            }
+        }
     }
 
     private var previewText: String {
@@ -113,7 +129,8 @@ struct NewTripSheet: View {
             departureDate: departureDate,
             returnDate: returnDate,
             templateIDs: Array(selectedTemplateIDs),
-            selectedTags: Array(selectedTags)
+            selectedTags: Array(selectedTags),
+            members: members
         )
         store.navigation = .tripDetail(trip.id)
         store.selectedTripID = trip.id

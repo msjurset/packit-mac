@@ -33,6 +33,8 @@ struct TemplateDetailView: View {
 
                     if store.isReceivedShare(templateID: template.id) {
                         SharedBadge(author: template.createdBy)
+                    } else if store._sharedTemplateIDs.contains(template.id) {
+                        SharingOutBadge()
                     }
 
                     InlineTagEditor(

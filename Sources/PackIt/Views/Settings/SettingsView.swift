@@ -95,6 +95,22 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+
+                Picker("Font Size", selection: Binding(
+                    get: { store.localConfig.fontSize ?? .medium },
+                    set: {
+                        store.localConfig.fontSize = $0
+                        store.localConfig.save()
+                    }
+                )) {
+                    ForEach(AppFontSize.allCases, id: \.self) { option in
+                        Text(option.label).tag(option)
+                    }
+                }
+                .pickerStyle(.segmented)
+                Text("Scales the app's text. Affects all windows.")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
             }
 
             Section("Startup") {

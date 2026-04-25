@@ -9,9 +9,14 @@ struct AddTripItemSheet: View {
     @State private var category = ""
     @State private var priority: Priority = .medium
     @State private var quantity = 1
+    @State private var owner: String = ""
+
+    private var trip: TripInstance? {
+        store.trips.first { $0.id == tripID }
+    }
 
     private var existingNames: Set<String> {
-        guard let trip = store.trips.first(where: { $0.id == tripID }) else { return [] }
+        guard let trip else { return [] }
         return Set(trip.items.map(\.name))
     }
 
@@ -34,6 +39,14 @@ struct AddTripItemSheet: View {
                 }
             }
             Stepper("Quantity: \(quantity)", value: $quantity, in: 1...99)
+            if let trip, !trip.members.isEmpty {
+                Picker("Owner", selection: $owner) {
+                    Text("Shared (everyone)").tag("")
+                    ForEach(trip.members, id: \.self) { m in
+                        Text(m).tag(m)
+                    }
+                }
+            }
         } footer: {
             Button("Cancel") { dismiss() }
                 .keyboardShortcut(.cancelAction)
@@ -46,7 +59,8 @@ struct AddTripItemSheet: View {
                     name: trimmed,
                     category: category.isEmpty ? nil : category,
                     priority: priority,
-                    quantity: quantity
+                    quantity: quantity,
+                    owner: owner.isEmpty ? nil : owner
                 )
                 dismiss()
             }

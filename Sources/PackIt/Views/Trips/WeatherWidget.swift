@@ -106,36 +106,29 @@ struct WeatherWidget: View {
         }
     }
 
+    private var paddedForecasts: [DayCell] {
+        let cal = Calendar.current
+        let lastTripDay = trip.returnDate ?? trip.departureDate
+        let real = forecasts.map { f -> DayCell in
+            let isPostTrip = cal.startOfDay(for: f.date) > cal.startOfDay(for: lastTripDay)
+            return DayCell.real(f, isPostTrip: isPostTrip)
+        }
+        let target = max(7, forecasts.count)
+        let needed = target - real.count
+        guard needed > 0 else { return real }
+        let lastDate = forecasts.last?.date ?? trip.departureDate
+        let placeholders: [DayCell] = (1...needed).map { offset in
+            let date = cal.date(byAdding: .day, value: offset, to: lastDate) ?? lastDate
+            return .placeholder(date: date)
+        }
+        return real + placeholders
+    }
+
     private var compactForecast: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                ForEach(forecasts) { day in
-                    VStack(spacing: 3) {
-                        Text(day.dayAbbrev)
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(.secondary)
-                        Image(systemName: day.symbol)
-                            .font(.system(size: 13))
-                            .foregroundStyle(day.symbolColor)
-                            .frame(height: 16)
-                        Text("\(Int(day.highF))°")
-                            .font(.system(size: 10, weight: .semibold).monospacedDigit())
-                            .foregroundStyle(.primary)
-                        Text("\(Int(day.lowF))°")
-                            .font(.system(size: 9).monospacedDigit())
-                            .foregroundStyle(.tertiary)
-                        if day.precipitationProbability > 20 {
-                            HStack(spacing: 1) {
-                                Image(systemName: "drop.fill")
-                                    .font(.system(size: 6))
-                                    .foregroundStyle(.cyan)
-                                Text("\(day.precipitationProbability)%")
-                                    .font(.system(size: 7).monospacedDigit())
-                                    .foregroundStyle(.cyan)
-                            }
-                        }
-                    }
-                    .frame(width: 38)
+                ForEach(paddedForecasts) { cell in
+                    dayColumn(cell)
                 }
             }
             .padding(.vertical, 4)
@@ -145,13 +138,54 @@ struct WeatherWidget: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
+    @ViewBuilder
+    private func dayColumn(_ cell: DayCell) -> some View {
+        let isPlaceholder = cell.forecast == nil
+        VStack(spacing: 3) {
+            Text(cell.dayAbbrev)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(isPlaceholder ? .tertiary : .secondary)
+            Image(systemName: cell.forecast?.symbol ?? "minus")
+                .font(.system(size: 13))
+                .foregroundStyle(isPlaceholder ? AnyShapeStyle(.tertiary) : AnyShapeStyle(cell.forecast!.symbolColor))
+                .frame(height: 16)
+            Text(cell.forecast.map { "\(Int($0.highF))°" } ?? "—")
+                .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                .foregroundStyle(isPlaceholder ? .tertiary : .primary)
+            Text(cell.forecast.map { "\(Int($0.lowF))°" } ?? " ")
+                .font(.system(size: 9).monospacedDigit())
+                .foregroundStyle(.tertiary)
+            // Precipitation row — always reserved so columns line up.
+            HStack(spacing: 1) {
+                if let f = cell.forecast, f.precipitationProbability > 20 {
+                    Image(systemName: "drop.fill")
+                        .font(.system(size: 6))
+                        .foregroundStyle(.cyan)
+                    Text("\(f.precipitationProbability)%")
+                        .font(.system(size: 7).monospacedDigit())
+                        .foregroundStyle(.cyan)
+                } else {
+                    Text(" ")
+                        .font(.system(size: 7).monospacedDigit())
+                }
+            }
+            .frame(height: 10)
+        }
+        .frame(width: 38)
+        .opacity(cell.isFaded ? 0.45 : 1.0)
+    }
+
     private func fetchWeather() {
         guard let dest = trip.destination else { return }
         isLoading = true
         error = nil
         Task {
             do {
-                let endDate = trip.returnDate ?? Calendar.current.date(byAdding: .day, value: 7, to: trip.departureDate)!
+                let cal = Calendar.current
+                let baseEnd = trip.returnDate ?? cal.date(byAdding: .day, value: 6, to: trip.departureDate) ?? trip.departureDate
+                let tripDayCount = (cal.dateComponents([.day], from: trip.departureDate, to: baseEnd).day ?? 0) + 1
+                let extra = max(0, 7 - tripDayCount)
+                let endDate = cal.date(byAdding: .day, value: extra, to: baseEnd) ?? baseEnd
                 let result = try await WeatherService.shared.fetchForecast(
                     latitude: dest.latitude,
                     longitude: dest.longitude,
@@ -180,6 +214,28 @@ struct WeatherWidget: View {
                 }
             }
         }
+    }
+}
+
+private struct DayCell: Identifiable {
+    let id: String
+    let dayAbbrev: String
+    let forecast: DailyForecast?
+    let isFaded: Bool
+
+    static func real(_ f: DailyForecast, isPostTrip: Bool) -> DayCell {
+        DayCell(id: f.id.uuidString, dayAbbrev: f.dayAbbrev, forecast: f, isFaded: isPostTrip)
+    }
+
+    static func placeholder(date: Date) -> DayCell {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "EEE"
+        return DayCell(
+            id: "ph-\(date.timeIntervalSinceReferenceDate)",
+            dayAbbrev: fmt.string(from: date),
+            forecast: nil,
+            isFaded: true
+        )
     }
 }
 

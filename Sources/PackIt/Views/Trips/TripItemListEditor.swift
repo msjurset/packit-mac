@@ -262,18 +262,13 @@ struct TripItemListEditor: View {
     }
 
     private func save() {
-        if !excludedItemIDs.isEmpty {
-            store.removeItems(from: tripID, itemIDs: excludedItemIDs)
-        }
-        for taskID in excludedPrepTaskIDs {
-            store.removePrepTask(from: tripID, taskID: taskID)
-        }
-        for procID in excludedProcedureIDs {
-            store.removeProcedure(from: tripID, procedureID: procID)
-        }
-        for linkID in excludedLinkIDs {
-            store.removeReferenceLink(from: tripID, linkID: linkID)
-        }
+        store.bulkRemoveFromTrip(
+            tripID,
+            itemIDs: excludedItemIDs,
+            prepTaskIDs: excludedPrepTaskIDs,
+            procedureIDs: excludedProcedureIDs,
+            referenceLinkIDs: excludedLinkIDs
+        )
         dismiss()
     }
 }

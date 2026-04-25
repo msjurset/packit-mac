@@ -12,6 +12,7 @@ struct TripEditorSheet: View {
     @State private var returnDate: Date = .now
     @State private var scratchNotes: String = ""
     @State private var status: TripStatus = .planning
+    @State private var members: [String] = []
 
     var body: some View {
         FormSheet(width: 500, height: 500) {
@@ -45,6 +46,13 @@ struct TripEditorSheet: View {
                 }
             }
 
+            Section("Members") {
+                Text("Each member can own packing items. Items with no owner are shared.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                MemberListEditor(members: $members)
+            }
+
             Section("Notes") {
                 TextEditor(text: $scratchNotes)
                     .frame(minHeight: 100)
@@ -65,6 +73,7 @@ struct TripEditorSheet: View {
             returnDate = trip.returnDate ?? Calendar.current.date(byAdding: .day, value: 7, to: trip.departureDate) ?? trip.departureDate
             scratchNotes = trip.scratchNotes
             status = trip.status
+            members = trip.members
         }
     }
 
@@ -77,6 +86,7 @@ struct TripEditorSheet: View {
         updated.returnDate = returnDate
         updated.scratchNotes = scratchNotes
         updated.status = status
+        updated.members = members
         store.updateTrip(updated)
         dismiss()
     }

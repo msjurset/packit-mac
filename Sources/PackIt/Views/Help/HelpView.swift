@@ -448,6 +448,37 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                 HelpSection(title: "Adding Items During a Trip", body: """
                 Click **Add Item** at the top of the packing list. Items added during a trip are marked as **ad-hoc** (purple "new" badge). After the trip, you can merge these back into a template.
                 """),
+                HelpSection(title: "Multi-select & Bulk Actions", body: """
+                **Cmd-click** an item to add it to a selection; **Shift-click** to extend the range. A floating action bar appears at the bottom of the list with **Owner**, **Duplicate For**, and **Remove** menus that apply to the entire selection.
+
+                Right-clicking an item that's part of the selection shows the same selection-wide actions (the menu labels include the count). Right-clicking outside the selection — or with no selection — gives you the single-item version.
+
+                **Plain click** anywhere clears the selection. **Esc** clears it too. **Double-click** any row to open its Edit sheet.
+                """, tips: [
+                    "Use the bulk Owner action to assign a stack of items to one person at once",
+                    "Use Duplicate For to instantly make per-member copies of a selected group",
+                ]),
+                HelpSection(title: "Members & Owners", body: """
+                Each trip can have its own list of **members**. Open the trip's edit sheet (toolbar Actions) and add names under **Members**. With members defined:
+
+                - The **Add Item** and **Edit Item** sheets show an Owner picker (or multi-select).
+                - Items with an owner show "(Name)" suffix when more than one member is filtered visible.
+                - At the top of the packing list, a **member filter** appears with a checkbox per member. Uncheck a member to hide their items. Shared items (no owner) are always visible.
+
+                If you assign a single item to multiple owners in the Edit sheet, saving creates one item per owner automatically.
+                """),
+                HelpSection(title: "Find in List", body: """
+                Press **/** while viewing the Packing tab to open a search field on the right side of the segmented picker. Matches highlight in yellow and the list scrolls to the first one.
+
+                Press **N**, **n**, or **Spacebar** (or click the down arrow) to advance to the next match. Up arrow goes back. **X** or **Esc** dismisses search and removes the highlights.
+
+                Search looks at item name, category, notes, and owner.
+                """),
+                HelpSection(title: "Reorder & Recategorize", body: """
+                **Drag** any item to reorder it within a category. **Drag onto an item in another category** to move it there. **Drag onto a category header** to append the item to that category.
+
+                **Double-click a category name** to rename it inline (applies to all items in that category). Click off the field or press Enter to save; Esc cancels.
+                """),
             ]
 
         case .todosAndNotes:

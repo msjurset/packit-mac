@@ -9,11 +9,12 @@ struct PackItApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(store)
-                .preferredColorScheme(store.colorScheme)
-                .onAppear { store.startBackgroundRefresh() }
-                .onDisappear { store.stopBackgroundRefresh() }
+            RootShell {
+                ContentView()
+                    .onAppear { store.startBackgroundRefresh() }
+                    .onDisappear { store.stopBackgroundRefresh() }
+            }
+            .environment(store)
         }
         .defaultSize(width: 1100, height: 700)
         .commands {
@@ -29,15 +30,30 @@ struct PackItApp: App {
         }
 
         Settings {
-            SettingsView()
+            RootShell { SettingsView() }
                 .environment(store)
-                .preferredColorScheme(store.colorScheme)
         }
 
         WindowGroup("PackIt Help", id: "help") {
-            HelpView()
+            RootShell { HelpView() }
+                .environment(store)
         }
         .defaultSize(width: 800, height: 550)
+    }
+}
+
+/// Wraps a root view to observe `PackItStore` and apply user-chosen
+/// preferences (color scheme, font size) reactively. Putting these in a
+/// View — rather than directly on a Scene's WindowGroup — ensures the
+/// modifiers actually re-apply when the store's localConfig mutates.
+private struct RootShell<Content: View>: View {
+    @Environment(PackItStore.self) private var store
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content
+            .preferredColorScheme(store.colorScheme)
+            .dynamicTypeSize((store.localConfig.fontSize ?? .medium).dynamicTypeSize)
     }
 }
 

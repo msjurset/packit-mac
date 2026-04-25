@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct TripDetailView: View {
     @Environment(PackItStore.self) private var store
@@ -8,6 +9,17 @@ struct TripDetailView: View {
     @State private var showInspector = true
     @State private var newTodoText = ""
     @State private var viewMode: TripViewMode = .packing
+    @State private var memberFilter: Set<String> = []
+    @State private var didSeedMemberFilter = false
+    @State private var editingItem: TripItem?
+    @State private var selectedItemIDs: Set<UUID> = []
+    @State private var lastClickedItemID: UUID?
+    @State private var showSearch = false
+    @State private var searchQuery = ""
+    @State private var currentMatchIndex = 0
+    @State private var keyMonitor: Any?
+    @FocusState private var searchFocused: Bool
+    @State private var scrollProxy: ScrollViewProxy?
 
     enum TripViewMode: String, CaseIterable {
         case packing = "Packing"
@@ -37,14 +49,24 @@ struct TripDetailView: View {
                     .padding(.horizontal)
                     .padding(.top, 10)
 
-                Picker("View", selection: $viewMode) {
-                    ForEach(TripViewMode.allCases, id: \.self) { mode in
-                        Text(mode.rawValue).tag(mode)
+                HStack {
+                    Picker("View", selection: $viewMode) {
+                        ForEach(TripViewMode.allCases, id: \.self) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 280)
+                    Spacer()
+                    if showSearch && viewMode == .packing {
+                        searchField
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 280)
+                .padding(.horizontal)
                 .padding(.bottom, 6)
+                .animation(.easeInOut(duration: 0.15), value: showSearch)
             }
             .background(.background)
 
@@ -68,17 +90,29 @@ struct TripDetailView: View {
                     }
 
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 20) {
-                            if !trip.overdueItems.isEmpty {
-                                overdueSection
+                        ScrollViewReader { proxy in
+                            VStack(alignment: .leading, spacing: 20) {
+                                if !trip.overdueItems.isEmpty {
+                                    overdueSection
+                                        .padding(.horizontal)
+                                }
+
+                                packingSection
                                     .padding(.horizontal)
                             }
-
-                            packingSection
-                                .padding(.horizontal)
+                            .padding(.vertical)
+                            .onAppear { scrollProxy = proxy }
                         }
-                        .padding(.vertical)
                     }
+                    .overlay(alignment: .bottom) {
+                        if !selectedItemIDs.isEmpty {
+                            bulkActionBar
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 12)
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
+                    }
+                    .animation(.easeInOut(duration: 0.18), value: selectedItemIDs.isEmpty)
                 }
             } else if viewMode == .meals {
                 MealPlanView(trip: trip)
@@ -102,6 +136,9 @@ struct TripDetailView: View {
                             Button { activeSheet = .merge } label: {
                                 Label("Merge to Template...", systemImage: "arrow.up.doc")
                             }
+                        }
+                        Button { store.duplicateTrip(id: trip.id) } label: {
+                            Label("Duplicate Trip", systemImage: "doc.on.doc")
                         }
                         Button { activeSheet = .export } label: {
                             Label("Export...", systemImage: "square.and.arrow.up")
@@ -145,6 +182,9 @@ struct TripDetailView: View {
             TripInspectorView(trip: trip, activeSheet: $activeSheet, pendingReminders: pendingReminders)
                 .inspectorColumnWidth(min: 250, ideal: 300, max: 380)
         }
+        .sheet(item: $editingItem) { item in
+            EditTripItemSheet(tripID: trip.id, originalItem: item)
+        }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .edit:
@@ -177,6 +217,20 @@ struct TripDetailView: View {
                     activeSheet = .reviewItems
                 }
             }
+            if !didSeedMemberFilter {
+                memberFilter = Set(trip.members)
+                didSeedMemberFilter = true
+            }
+            installSearchKeyMonitor()
+        }
+        .onDisappear { removeSearchKeyMonitor() }
+        .onChange(of: trip.members) { _, newMembers in
+            // Drop members no longer present; auto-include any newly-added members.
+            memberFilter = memberFilter.intersection(Set(newMembers)).union(Set(newMembers))
+        }
+        .onChange(of: searchQuery) { _, _ in
+            currentMatchIndex = 0
+            scrollToCurrentMatch()
         }
     }
 
@@ -193,6 +247,8 @@ struct TripDetailView: View {
                                 .font(.title3.bold())
                             if store.isReceivedShare(tripID: trip.id) {
                                 SharedBadge(author: trip.createdBy)
+                            } else if store._sharedTripIDs.contains(trip.id) {
+                                SharingOutBadge()
                             }
                         }
                         Text(trip.status.label)
@@ -287,9 +343,28 @@ struct TripDetailView: View {
 
     // MARK: - Packing Section
 
-    private var packingSection: some View {
-        let grouped = Dictionary(grouping: trip.items, by: { $0.category ?? "Uncategorized" })
+    private var visiblePackingItems: [TripItem] {
+        guard !trip.members.isEmpty else { return trip.items }
+        return trip.items.filter { item in
+            guard let owner = item.owner else { return true } // shared, always visible
+            return memberFilter.contains(owner)
+        }
+    }
+
+    private var showOwnerSuffix: Bool {
+        memberFilter.count > 1
+    }
+
+    private var orderedVisibleItems: [TripItem] {
+        let grouped = Dictionary(grouping: visiblePackingItems, by: { $0.category ?? "Uncategorized" })
         let sortedKeys = grouped.keys.sorted()
+        return sortedKeys.flatMap { grouped[$0] ?? [] }
+    }
+
+    private var packingSection: some View {
+        let grouped = Dictionary(grouping: visiblePackingItems, by: { $0.category ?? "Uncategorized" })
+        let sortedKeys = grouped.keys.sorted()
+        let ordered = orderedVisibleItems
 
         return VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -311,10 +386,336 @@ struct TripDetailView: View {
                 .foregroundStyle(.packitTeal)
             }
 
+            if trip.members.count > 1 {
+                memberFilterBar
+            }
+
             ForEach(Array(sortedKeys.enumerated()), id: \.element) { index, category in
-                CategorySection(category: category, items: grouped[category] ?? [], tripID: trip.id, isAlternate: index.isMultiple(of: 2))
+                CategorySection(
+                    category: category,
+                    items: grouped[category] ?? [],
+                    tripID: trip.id,
+                    isAlternate: index.isMultiple(of: 2),
+                    showOwnerSuffix: showOwnerSuffix,
+                    selectedItemIDs: selectedItemIDs,
+                    searchMatchIDs: searchMatchSet,
+                    currentSearchMatchID: currentMatchID,
+                    onEdit: { item in editingItem = item },
+                    onSelect: { item, modifiers in
+                        handleItemClick(item: item, modifiers: modifiers, ordered: ordered)
+                    },
+                    onBulkSetOwner: { applyBulkOwner($0) },
+                    onBulkDuplicate: { applyBulkDuplicate($0) },
+                    onBulkRemove: { applyBulkRemove() }
+                )
             }
         }
+        .contentShape(Rectangle())
+        .simultaneousGesture(
+            TapGesture(count: 1).onEnded {
+                let mods = NSEvent.modifierFlags
+                if !mods.contains(.command) && !mods.contains(.shift) && !selectedItemIDs.isEmpty {
+                    clearSelection()
+                }
+            }
+        )
+    }
+
+    private func handleItemClick(item: TripItem, modifiers: EventModifiers, ordered: [TripItem]) {
+        if modifiers.contains(.shift), let anchorID = lastClickedItemID,
+           let from = ordered.firstIndex(where: { $0.id == anchorID }),
+           let to = ordered.firstIndex(where: { $0.id == item.id }) {
+            let range = from <= to ? from...to : to...from
+            for i in range {
+                selectedItemIDs.insert(ordered[i].id)
+            }
+            lastClickedItemID = item.id
+        } else if modifiers.contains(.command) {
+            if selectedItemIDs.contains(item.id) {
+                selectedItemIDs.remove(item.id)
+            } else {
+                selectedItemIDs.insert(item.id)
+            }
+            lastClickedItemID = item.id
+        } else {
+            // Plain click clears selection.
+            clearSelection()
+        }
+    }
+
+    @ViewBuilder
+    private var bulkActionBar: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "checkmark.rectangle.stack.fill")
+                .foregroundStyle(.packitTeal)
+            Text("\(selectedItemIDs.count) selected")
+                .font(.callout.weight(.medium))
+
+            Spacer()
+
+            if !trip.members.isEmpty {
+                Menu {
+                    Button { applyBulkOwner(nil) } label: { Text("Shared (everyone)") }
+                    ForEach(trip.members, id: \.self) { m in
+                        Button { applyBulkOwner(m) } label: { Text(m) }
+                    }
+                } label: {
+                    Label("Owner", systemImage: "person.crop.circle")
+                        .font(.caption)
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+
+                Menu {
+                    Button { applyBulkDuplicate(nil) } label: { Text("Shared") }
+                    ForEach(trip.members, id: \.self) { m in
+                        Button { applyBulkDuplicate(m) } label: { Text(m) }
+                    }
+                } label: {
+                    Label("Duplicate For", systemImage: "plus.square.on.square")
+                        .font(.caption)
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+            }
+
+            Button {
+                applyBulkRemove()
+            } label: {
+                Label("Remove", systemImage: "trash")
+                    .font(.caption)
+                    .foregroundStyle(.packitRed)
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                clearSelection()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Clear selection (Esc)")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.regularMaterial)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.packitTeal.opacity(0.4), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .shadow(color: .black.opacity(0.18), radius: 8, x: 0, y: 4)
+    }
+
+    private func clearSelection() {
+        selectedItemIDs.removeAll()
+        lastClickedItemID = nil
+    }
+
+    // MARK: - Search
+
+    private var searchMatchIDs: [UUID] {
+        let q = searchQuery.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return [] }
+        return orderedVisibleItems.compactMap { item in
+            let hay = [item.name, item.category ?? "", item.notes ?? "", item.owner ?? ""]
+                .joined(separator: " ")
+                .lowercased()
+            return hay.contains(q) ? item.id : nil
+        }
+    }
+
+    private var searchMatchSet: Set<UUID> { Set(searchMatchIDs) }
+
+    private var currentMatchID: UUID? {
+        guard !searchMatchIDs.isEmpty else { return nil }
+        let idx = max(0, min(currentMatchIndex, searchMatchIDs.count - 1))
+        return searchMatchIDs[idx]
+    }
+
+    @ViewBuilder
+    private var searchField: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "magnifyingglass")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField("Find in list…", text: $searchQuery)
+                .textFieldStyle(.plain)
+                .font(.callout)
+                .frame(width: 160)
+                .focused($searchFocused)
+                .onSubmit { advanceMatch(by: 1) }
+            if !searchMatchIDs.isEmpty {
+                Text("\(currentMatchIndex + 1)/\(searchMatchIDs.count)")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            } else if !searchQuery.isEmpty {
+                Text("0")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.tertiary)
+            }
+            Button { advanceMatch(by: -1) } label: {
+                Image(systemName: "chevron.up")
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .focusable(false)
+            .disabled(searchMatchIDs.isEmpty)
+            .help("Previous match")
+            Button { advanceMatch(by: 1) } label: {
+                Image(systemName: "chevron.down")
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .focusable(false)
+            .disabled(searchMatchIDs.isEmpty)
+            .help("Next match")
+            Button { dismissSearch() } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+                    .font(.callout)
+            }
+            .buttonStyle(.plain)
+            .focusable(false)
+            .help("Close search")
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.secondary.opacity(0.10))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    private func openSearch() {
+        showSearch = true
+        DispatchQueue.main.async { searchFocused = true }
+    }
+
+    private func dismissSearch() {
+        showSearch = false
+        searchQuery = ""
+        currentMatchIndex = 0
+        searchFocused = false
+    }
+
+    private func advanceMatch(by delta: Int) {
+        guard !searchMatchIDs.isEmpty else { return }
+        let n = searchMatchIDs.count
+        currentMatchIndex = ((currentMatchIndex + delta) % n + n) % n
+        scrollToCurrentMatch()
+    }
+
+    private func scrollToCurrentMatch() {
+        guard let id = currentMatchID, let proxy = scrollProxy else { return }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            proxy.scrollTo(id, anchor: .center)
+        }
+    }
+
+    private func installSearchKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            handleSearchKey(event) ? nil : event
+        }
+    }
+
+    private func removeSearchKeyMonitor() {
+        if let m = keyMonitor {
+            NSEvent.removeMonitor(m)
+            keyMonitor = nil
+        }
+    }
+
+    private func handleSearchKey(_ event: NSEvent) -> Bool {
+        // Ignore when a text field elsewhere has focus.
+        let textViewFocused = event.window?.firstResponder is NSTextView
+        let chars = event.charactersIgnoringModifiers ?? ""
+        let mods = event.modifierFlags
+        let hasNonShiftModifier = mods.intersection([.command, .control, .option]).isEmpty == false
+
+        // "/" toggles search — only when no text field has focus.
+        if chars == "/" && !textViewFocused && !hasNonShiftModifier {
+            if showSearch { dismissSearch() } else { openSearch() }
+            return true
+        }
+
+        // Escape always dismisses search.
+        if event.keyCode == 53, showSearch {
+            dismissSearch()
+            return true
+        }
+
+        // n / N / space → next match (only when search is open and field unfocused).
+        if showSearch && !textViewFocused && !searchMatchIDs.isEmpty && !hasNonShiftModifier {
+            if chars.lowercased() == "n" || chars == " " {
+                advanceMatch(by: 1)
+                return true
+            }
+        }
+
+        return false
+    }
+
+    private func applyBulkOwner(_ owner: String?) {
+        let ids = selectedItemIDs
+        guard !ids.isEmpty else { return }
+        store.bulkSetOwner(in: trip.id, itemIDs: ids, owner: owner)
+        clearSelection()
+    }
+
+    private func applyBulkDuplicate(_ owner: String?) {
+        let ids = selectedItemIDs
+        guard !ids.isEmpty else { return }
+        store.bulkDuplicate(in: trip.id, itemIDs: ids, newOwner: owner)
+        clearSelection()
+    }
+
+    private func applyBulkRemove() {
+        let ids = selectedItemIDs
+        guard !ids.isEmpty else { return }
+        store.removeItems(from: trip.id, itemIDs: ids)
+        clearSelection()
+    }
+
+    @ViewBuilder
+    private var memberFilterBar: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "person.2.fill")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .help("Filter the list by member. Items owned by an unchecked member are hidden. Shared items (no owner) are always shown.")
+            ForEach(trip.members, id: \.self) { member in
+                let included = memberFilter.contains(member)
+                Button {
+                    if included {
+                        memberFilter.remove(member)
+                    } else {
+                        memberFilter.insert(member)
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: included ? "checkmark.square.fill" : "square")
+                            .foregroundStyle(included ? Color.packitTeal : Color.secondary)
+                        Text(member)
+                            .foregroundStyle(included ? .primary : .secondary)
+                    }
+                    .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .focusable(false)
+                .help(included
+                      ? "Hide \(member)'s items from this list"
+                      : "Show \(member)'s items in this list")
+            }
+            Spacer()
+            Text("Shared items always shown")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.secondary.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
     // MARK: - Prep Task Timeline
@@ -476,10 +877,33 @@ struct CategorySection: View {
     let items: [TripItem]
     let tripID: UUID
     var isAlternate: Bool = false
+    var showOwnerSuffix: Bool = false
+    var selectedItemIDs: Set<UUID> = []
+    var searchMatchIDs: Set<UUID> = []
+    var currentSearchMatchID: UUID?
+    var onEdit: (TripItem) -> Void = { _ in }
+    var onSelect: (TripItem, EventModifiers) -> Void = { _, _ in }
+    var onBulkSetOwner: (String?) -> Void = { _ in }
+    var onBulkDuplicate: (String?) -> Void = { _ in }
+    var onBulkRemove: () -> Void = {}
+
+    @State private var isRenaming = false
+    @State private var renameText = ""
+    @State private var isHeaderDropTargeted = false
+    @State private var didCancelRename = false
+    @FocusState private var isRenameFocused: Bool
 
     private var packedCount: Int { items.filter(\.isPacked).count }
     private var allPacked: Bool { !items.isEmpty && packedCount == items.count }
     private let columns = [GridItem(.adaptive(minimum: 280, maximum: .infinity), spacing: 4, alignment: .top)]
+    private var categoryForStore: String? { category == "Uncategorized" ? nil : category }
+
+    private func commitRename() {
+        let trimmed = renameText.trimmingCharacters(in: .whitespaces)
+        isRenaming = false
+        guard !trimmed.isEmpty, trimmed != category else { return }
+        store.renameCategory(in: tripID, from: categoryForStore, to: trimmed)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -505,10 +929,41 @@ struct CategorySection: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(CategoryIcon.color(for: category))
                     .frame(width: 16)
-                Text(category.uppercased())
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.primary.opacity(0.7))
-                    .tracking(0.5)
+
+                if isRenaming {
+                    TextField("Category", text: $renameText)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 12, weight: .bold))
+                        .frame(maxWidth: 180)
+                        .focused($isRenameFocused)
+                        .onSubmit { commitRename() }
+                        .onExitCommand {
+                            didCancelRename = true
+                            isRenaming = false
+                        }
+                        .onChange(of: isRenameFocused) { _, focused in
+                            if !focused && isRenaming {
+                                if didCancelRename {
+                                    didCancelRename = false
+                                    isRenaming = false
+                                } else {
+                                    commitRename()
+                                }
+                            }
+                        }
+                } else {
+                    Text(category.uppercased())
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.primary.opacity(0.7))
+                        .tracking(0.5)
+                        .onTapGesture(count: 2) {
+                            renameText = category == "Uncategorized" ? "" : category
+                            didCancelRename = false
+                            isRenaming = true
+                            DispatchQueue.main.async { isRenameFocused = true }
+                        }
+                        .help("Double-click to rename")
+                }
                 Spacer()
                 Text("\(packedCount)/\(items.count)")
                     .font(.caption2.monospacedDigit())
@@ -516,10 +971,33 @@ struct CategorySection: View {
             }
             .padding(.horizontal, 12)
             .padding(.top, 10)
+            .padding(.vertical, 4)
+            .background(isHeaderDropTargeted ? Color.packitTeal.opacity(0.15) : .clear)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .dropDestination(for: String.self) { droppedIDs, _ in
+                guard let droppedID = droppedIDs.first,
+                      let draggedUUID = UUID(uuidString: droppedID) else { return false }
+                store.moveTripItem(in: tripID, itemID: draggedUUID, toCategory: categoryForStore)
+                return true
+            } isTargeted: { isHeaderDropTargeted = $0 }
 
             LazyVGrid(columns: columns, spacing: 2) {
                 ForEach(items) { item in
-                    PackingItemRow(item: item, tripID: tripID)
+                    PackingItemRow(
+                        item: item,
+                        tripID: tripID,
+                        showOwnerSuffix: showOwnerSuffix,
+                        isSelected: selectedItemIDs.contains(item.id),
+                        selectionCount: selectedItemIDs.count,
+                        isSearchMatch: searchMatchIDs.contains(item.id),
+                        isCurrentSearchMatch: currentSearchMatchID == item.id,
+                        onEdit: { onEdit(item) },
+                        onSelect: { mods in onSelect(item, mods) },
+                        onBulkSetOwner: { onBulkSetOwner($0) },
+                        onBulkDuplicate: { onBulkDuplicate($0) },
+                        onBulkRemove: { onBulkRemove() }
+                    )
+                    .id(item.id)
                         .draggable(item.id.uuidString)
                         .dropDestination(for: String.self) { droppedIDs, _ in
                             guard let droppedID = droppedIDs.first,
