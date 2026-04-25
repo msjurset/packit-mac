@@ -6,16 +6,16 @@
     <description>PackIt app updates</description>
     <language>en</language>
     <item>
-      <title>Version 1.1.1</title>
-      <sparkle:version>19</sparkle:version>
-      <sparkle:shortVersionString>1.1.1</sparkle:shortVersionString>
+      <title>Version 1.2.0</title>
+      <sparkle:version>21</sparkle:version>
+      <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
-      <pubDate>Thu, 23 Apr 2026 16:49:04 +0000</pubDate>
+      <pubDate>Sat, 25 Apr 2026 19:38:04 +0000</pubDate>
       <enclosure
-        url="https://github.com/msjurset/packit-mac/releases/download/v1.1.1/PackIt-1.1.1.dmg"
-        length="4759967"
+        url="https://github.com/msjurset/packit-mac/releases/download/v1.2.0/PackIt-1.2.0.dmg"
+        length="4939954"
         type="application/octet-stream"
-        sparkle:edSignature="A6emwD8TcfH6TPzP1OMrn9rdF4sR3WuXOEmT986zB6rPIGa3utWMzaoK/lReDsNFdfuEwYmp3mp5OLU4j4FKDg==" />
+        sparkle:edSignature="rirCRqDqsZrcujgq0U8taaij7AlJ5W9cDtto89Av8GdS1h3FfRkpenZjOpzgMhwEOFTAzDOTgBFoz7DtY/s1Aw==" />
     </item>
   </channel>
 </rss>
