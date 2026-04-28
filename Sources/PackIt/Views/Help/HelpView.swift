@@ -468,16 +468,18 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                 If you assign a single item to multiple owners in the Edit sheet, saving creates one item per owner automatically.
                 """),
                 HelpSection(title: "Find in List", body: """
-                Press **/** while viewing the Packing tab to open a search field on the right side of the segmented picker. Matches highlight in yellow and the list scrolls to the first one.
+                Press **/** or **⌘F** (Edit > Find…) while viewing the Packing tab to open a search field on the right side of the segmented picker. Matches highlight in yellow and the list scrolls to the first one.
 
                 Press **N**, **n**, or **Spacebar** (or click the down arrow) to advance to the next match. Up arrow goes back. **X** or **Esc** dismisses search and removes the highlights.
 
-                Search looks at item name, category, notes, and owner.
+                Search looks at item name, category, notes, and owner. You can also use **token filters** like `category:Bath`, `owner:Mark`, `name:tooth`, `priority:high`, `packed:no`, or `notes:travel`. Press **Tab** to cycle through suggestions; **Enter** commits the highlighted one.
                 """),
                 HelpSection(title: "Reorder & Recategorize", body: """
                 **Drag** any item to reorder it within a category. **Drag onto an item in another category** to move it there. **Drag onto a category header** to append the item to that category.
 
                 **Double-click a category name** to rename it inline (applies to all items in that category). Click off the field or press Enter to save; Esc cancels.
+
+                Switch the **Manual / Name** toggle in the Packing List header to choose how categories are sorted. In Manual mode, drag a section's header onto the insertion line above another section to reorder.
                 """),
             ]
 
@@ -637,6 +639,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                 **⌘N** — New template
                 **⌘⇧N** — New trip
                 **⌘K** — Quick search
+                **⌘F** — Find in current packing list
                 **⌘Z** — Undo
                 **⌘⇧Z** — Redo
                 **⌘,** — Settings

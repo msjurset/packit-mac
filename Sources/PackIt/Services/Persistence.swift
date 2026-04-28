@@ -25,6 +25,7 @@ actor Persistence {
     private var localTemplatesDir: URL { baseURL.appendingPathComponent("templates") }
     private var localTripsDir: URL { baseURL.appendingPathComponent("trips") }
     private var localTagsFile: URL { baseURL.appendingPathComponent("tags.json") }
+    private var categoriesFile: URL { baseURL.appendingPathComponent("categories.json") }
 
     private var sharedTemplatesDir: URL? { sharedURL?.appendingPathComponent("templates") }
     private var sharedTripsDir: URL? { sharedURL?.appendingPathComponent("trips") }
@@ -210,6 +211,21 @@ actor Persistence {
               let data = try? Data(contentsOf: url),
               let tags = try? decoder.decode([ContextTag].self, from: data) else { return [] }
         return tags
+    }
+
+    // MARK: - Item Categories
+
+    func loadCategories() -> [ItemCategory] {
+        guard FileManager.default.fileExists(atPath: categoriesFile.path),
+              let data = try? Data(contentsOf: categoriesFile),
+              let cats = try? decoder.decode([ItemCategory].self, from: data)
+        else { return [] }
+        return cats
+    }
+
+    func saveCategories(_ cats: [ItemCategory]) throws {
+        let data = try encoder.encode(cats)
+        try data.write(to: categoriesFile, options: .atomic)
     }
 
     // MARK: - Config

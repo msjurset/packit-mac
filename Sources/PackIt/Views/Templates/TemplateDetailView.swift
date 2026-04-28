@@ -120,7 +120,7 @@ struct TemplateDetailView: View {
 
                 // Items by category
                 let grouped = Dictionary(grouping: template.items, by: { $0.category ?? "Uncategorized" })
-                let sortedKeys = grouped.keys.sorted()
+                let sortedKeys = store.orderedCategoryNames(Set(grouped.keys))
 
                 ForEach(sortedKeys, id: \.self) { category in
                     VStack(alignment: .leading, spacing: 6) {

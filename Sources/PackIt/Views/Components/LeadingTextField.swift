@@ -8,6 +8,7 @@ struct LeadingTextField: NSViewRepresentable {
     @Binding var text: String
     var prompt: String = ""
     var isFocused: Binding<Bool>?
+    var autoFocus: Bool = false
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text, isFocused: isFocused)
@@ -26,6 +27,14 @@ struct LeadingTextField: NSViewRepresentable {
         tf.lineBreakMode = .byTruncatingTail
         tf.cell?.truncatesLastVisibleLine = true
         tf.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        if autoFocus {
+            DispatchQueue.main.async {
+                if let window = tf.window {
+                    window.makeFirstResponder(tf)
+                    (tf.currentEditor() as? NSTextView)?.selectAll(nil)
+                }
+            }
+        }
         return tf
     }
 

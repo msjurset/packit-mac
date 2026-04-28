@@ -104,6 +104,13 @@ struct LocalConfig: Codable, Equatable, Sendable {
     var visualCrossingApiKey: String = ""
     var lastSeenSharedAt: Date?
     var lastSelectedTripByStatus: [TripStatus: UUID]?
+    /// Optional so older config files (which lack the key) still decode.
+    /// Use `resolvedCategorySortMode` to read with the default applied.
+    var categorySortMode: CategorySortMode?
+
+    var resolvedCategorySortMode: CategorySortMode {
+        categorySortMode ?? .name
+    }
 
     var hasSharedPath: Bool {
         !sharedDataPath.isEmpty

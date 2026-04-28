@@ -42,10 +42,11 @@ struct TripInstance: Codable, Identifiable, Hashable, Sendable {
     var createdBy: String?
     var rank: Int
     var members: [String]
+    var travelMode: TravelMode
     var createdAt: Date
     var updatedAt: Date
 
-    init(id: UUID = UUID(), name: String, icon: TripIcon = .suitcase, destination: TripDestination? = nil, sourceTemplateIDs: [UUID] = [], departureDate: Date = .now, returnDate: Date? = nil, items: [TripItem] = [], prepTasks: [PrepTask] = [], todos: [TripTodo] = [], activities: [TripActivity] = [], procedures: [Procedure] = [], mealPlan: MealPlan? = nil, referenceLinks: [ReferenceLink] = [], version: Int = 1, lastModifiedBy: String? = nil, createdBy: String? = nil, rank: Int = Int.max, members: [String] = [], scratchNotes: String = "", status: TripStatus = .planning, createdAt: Date = .now, updatedAt: Date = .now) {
+    init(id: UUID = UUID(), name: String, icon: TripIcon = .suitcase, destination: TripDestination? = nil, sourceTemplateIDs: [UUID] = [], departureDate: Date = .now, returnDate: Date? = nil, items: [TripItem] = [], prepTasks: [PrepTask] = [], todos: [TripTodo] = [], activities: [TripActivity] = [], procedures: [Procedure] = [], mealPlan: MealPlan? = nil, referenceLinks: [ReferenceLink] = [], version: Int = 1, lastModifiedBy: String? = nil, createdBy: String? = nil, rank: Int = Int.max, members: [String] = [], travelMode: TravelMode = .plane, scratchNotes: String = "", status: TripStatus = .planning, createdAt: Date = .now, updatedAt: Date = .now) {
         self.id = id
         self.name = name
         self.icon = icon
@@ -67,6 +68,7 @@ struct TripInstance: Codable, Identifiable, Hashable, Sendable {
         self.createdBy = createdBy
         self.rank = rank
         self.members = members
+        self.travelMode = travelMode
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -94,6 +96,7 @@ struct TripInstance: Codable, Identifiable, Hashable, Sendable {
         createdBy = try container.decodeIfPresent(String.self, forKey: .createdBy)
         rank = try container.decodeIfPresent(Int.self, forKey: .rank) ?? Int.max
         members = try container.decodeIfPresent([String].self, forKey: .members) ?? []
+        travelMode = try container.decodeIfPresent(TravelMode.self, forKey: .travelMode) ?? .plane
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? .now
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? .now
     }

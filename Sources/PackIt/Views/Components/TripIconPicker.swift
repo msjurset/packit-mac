@@ -209,7 +209,9 @@ struct IconPickerSearchField: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSTextField {
-        let tf = NSTextField()
+        // Use NoAutoFillTextField to suppress the macOS autofill / inline-prediction
+        // popup that otherwise covers content rendered below this field.
+        let tf = NoAutoFillTextField()
         tf.placeholderString = placeholder
         tf.isBordered = false
         tf.drawsBackground = false

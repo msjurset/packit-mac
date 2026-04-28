@@ -52,9 +52,9 @@ struct CategoryField: View {
                 }, rowLabel: { suggestion in
                     AnyView(
                         HStack(spacing: 8) {
-                            Image(systemName: CategoryIcon.icon(for: suggestion))
+                            Image(systemName: store.categoryIcon(for: suggestion))
                                 .font(.caption)
-                                .foregroundStyle(CategoryIcon.color(for: suggestion))
+                                .foregroundStyle(store.categoryColor(for: suggestion))
                                 .frame(width: 16)
                             Text(suggestion)
                                 .font(.callout)

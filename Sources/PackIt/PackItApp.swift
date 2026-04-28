@@ -1,6 +1,10 @@
 import SwiftUI
 import Sparkle
 
+extension Notification.Name {
+    static let packitOpenTripSearch = Notification.Name("packit.openTripSearch")
+}
+
 @main
 struct PackItApp: App {
     @State private var store = PackItStore()
@@ -26,6 +30,12 @@ struct PackItApp: App {
                     openWindow(id: "help")
                 }
                 .keyboardShortcut("?", modifiers: .command)
+            }
+            CommandGroup(after: .textEditing) {
+                Button("Find…") {
+                    NotificationCenter.default.post(name: .packitOpenTripSearch, object: nil)
+                }
+                .keyboardShortcut("f", modifiers: .command)
             }
         }
 

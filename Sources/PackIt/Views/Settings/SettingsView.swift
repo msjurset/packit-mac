@@ -9,6 +9,8 @@ struct SettingsView: View {
         TabView {
             generalTab
                 .tabItem { Label("General", systemImage: "gearshape") }
+            CategoriesSettingsView()
+                .tabItem { Label("Categories", systemImage: "square.grid.2x2") }
             weatherTab
                 .tabItem { Label("Weather", systemImage: "cloud.sun") }
             printSettingsTab

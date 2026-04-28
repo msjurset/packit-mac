@@ -30,14 +30,18 @@ enum PrepTaskTiming: String, Codable, CaseIterable, Comparable, Sendable {
         }
     }
 
-    var icon: String {
+    var icon: String { icon(for: .plane) }
+
+    /// Travel-mode-aware icon. Only `.dayOf` and `.onReturn` actually vary;
+    /// the rest are calendar-based and identical across modes.
+    func icon(for travelMode: TravelMode) -> String {
         switch self {
         case .early: "calendar.badge.exclamationmark"
         case .weeksBefore: "calendar.badge.clock"
         case .weekBefore: "calendar"
         case .daysBefore: "calendar.day.timeline.left"
-        case .dayOf: "airplane.departure"
-        case .onReturn: "airplane.arrival"
+        case .dayOf: travelMode.departureSymbol
+        case .onReturn: travelMode.arrivalSymbol
         }
     }
 

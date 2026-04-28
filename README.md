@@ -30,6 +30,7 @@ A macOS app for managing reusable packing list templates, trip-specific checklis
 - Drag-to-reorder trips within each section
 - Auto-select last viewed trip per section when navigating
 - Duplicate a trip (deep copy with reset packed/complete state, status reset to Planning)
+- Travel mode (Plane, Car, Train, Bus, RV, Boat, Bicycle, Walking) — drives the prep timeline "Day Of" / "On Return" icons and the trip header departure/return rows
 
 ### Members & Item Ownership
 - Define members per trip (e.g. you + Kim) with chip-style add/remove
@@ -45,9 +46,17 @@ A macOS app for managing reusable packing list templates, trip-specific checklis
 - Right-click on a row in a multi-selection applies the action to the entire selection
 - Plain click anywhere clears the selection
 - Double-click a row to open the Edit sheet
-- Press `/` to find in list — text search with N / spacebar / arrow buttons to advance, Esc to close
+- Press `/` or `⌘F` to find in list — text search with N / spacebar / arrow buttons to advance, Esc to close
+- Tokenized search filters: `category:`, `owner:`, `name:`, `priority:`, `packed:`, `notes:` with Tab-cycle autocomplete
 - Drag items into another category to recategorize; double-click a category header to rename
 - Drag-drop indicators with row-parting animation
+
+### Categories
+- First-class categories with custom icon (curated SF Symbol library) and color
+- Manage from Settings → Categories: rename, recolor, choose new icon, see usage counts
+- Sort categories Manually (drag-to-reorder with insertion mark) or by Name (alphabetical)
+- Inline icon picker — double-click any category icon in a packing list to change it
+- Renaming a category to an existing name merges items under the existing one
 
 ### Prep Tasks
 - 6-tier timing: Early (-21d), 2 Weeks (-14d), 1 Week (-7d), Day Before (-1d), Day Of, On Return

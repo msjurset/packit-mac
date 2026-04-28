@@ -6,6 +6,7 @@ final class PackItStore {
     var templates: [PackingTemplate] = []
     var trips: [TripInstance] = []
     var tags: [ContextTag] = []
+    var categories: [ItemCategory] = []
 
     var searchQuery = ""
     var navigation: NavigationItem? = .templates {
@@ -40,6 +41,29 @@ final class PackItStore {
     var newSharedItems: [NewSharedItem] = []
     private var knownVersions: [UUID: Int] = [:]
     private var refreshTimer: Timer?
+
+    // Per-trip UI state that survives view re-creations (fullscreen toggle etc.)
+    struct TripUIState: Sendable {
+        var memberFilter: Set<String>?     // nil = not seeded yet
+        var prepWidth: CGFloat = 220
+    }
+    var tripUIState: [UUID: TripUIState] = [:]
+
+    func tripUI(_ tripID: UUID) -> TripUIState {
+        tripUIState[tripID] ?? TripUIState()
+    }
+
+    func setTripMemberFilter(_ filter: Set<String>, for tripID: UUID) {
+        var s = tripUIState[tripID] ?? TripUIState()
+        s.memberFilter = filter
+        tripUIState[tripID] = s
+    }
+
+    func setTripPrepWidth(_ width: CGFloat, for tripID: UUID) {
+        var s = tripUIState[tripID] ?? TripUIState()
+        s.prepWidth = width
+        tripUIState[tripID] = s
+    }
 
     private let persistence: Persistence
     private let notifications: NotificationService?
@@ -509,6 +533,9 @@ final class PackItStore {
                 templates.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
                 trips = try await persistence.loadTrips()
                 tags = try await persistence.loadTags()
+                categories = await persistence.loadCategories()
+                dedupeCategories()
+                bootstrapCategoriesIfNeeded()
                 _ = await notifications?.requestPermission()
                 snapshotVersions()
                 await performRefreshSharedState()
@@ -1395,6 +1422,248 @@ final class PackItStore {
         }
 
         updateTemplate(template, actionName: "Merge Items")
+    }
+
+    // MARK: - Item Categories
+
+    func category(named name: String) -> ItemCategory? {
+        categories.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+    }
+
+    func categoryIcon(for name: String?) -> String {
+        guard let name, !name.isEmpty else { return CategoryIcon.icon(for: "") }
+        if let cat = category(named: name) { return cat.icon }
+        return CategoryIcon.icon(for: name)
+    }
+
+    func categoryColor(for name: String?) -> Color {
+        guard let name, !name.isEmpty else { return CategoryIcon.color(for: "") }
+        if let cat = category(named: name) {
+            return CategoryColor(rawValue: cat.color)?.color ?? CategoryIcon.color(for: name)
+        }
+        return CategoryIcon.color(for: name)
+    }
+
+    /// Insert or update a category record by name (case-insensitive match).
+    func upsertCategory(_ cat: ItemCategory) {
+        if let idx = categories.firstIndex(where: { $0.id == cat.id }) {
+            categories[idx] = cat
+        } else if let idx = categories.firstIndex(where: { $0.name.caseInsensitiveCompare(cat.name) == .orderedSame }) {
+            categories[idx] = cat
+        } else {
+            categories.append(cat)
+        }
+        persistCategories()
+    }
+
+    func deleteCategory(id: UUID) {
+        categories.removeAll { $0.id == id }
+        persistCategories()
+    }
+
+    /// Rename a category globally: updates the entry, plus every item in every
+    /// trip and template that uses the old name. Atomic in-memory + persisted.
+    /// If the new name already matches another category, the old entry is
+    /// removed and items merge into the existing target.
+    func renameCategoryGlobally(from oldName: String, to newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, trimmed.caseInsensitiveCompare(oldName) != .orderedSame else { return }
+
+        let oldIdx = categories.firstIndex(where: { $0.name.caseInsensitiveCompare(oldName) == .orderedSame })
+        let targetIdx = categories.firstIndex(where: { $0.name.caseInsensitiveCompare(trimmed) == .orderedSame })
+
+        switch (oldIdx, targetIdx) {
+        case let (.some(o), .some(t)) where o != t:
+            // Target name already exists — drop the old entry so items merge
+            // under the existing metadata (icon/color/rank preserved).
+            categories.remove(at: o)
+        case let (.some(o), .none):
+            // Plain rename.
+            categories[o].name = trimmed
+        default:
+            break
+        }
+        persistCategories()
+
+        // Update every template
+        for tIdx in templates.indices {
+            var changed = false
+            for iIdx in templates[tIdx].items.indices where templates[tIdx].items[iIdx].category?.caseInsensitiveCompare(oldName) == .orderedSame {
+                templates[tIdx].items[iIdx].category = trimmed
+                changed = true
+            }
+            if changed {
+                let snapshot = templates[tIdx]
+                Task { try? await persistence.saveTemplate(snapshot) }
+            }
+        }
+
+        // Update every trip
+        for tIdx in trips.indices {
+            var changed = false
+            for iIdx in trips[tIdx].items.indices where trips[tIdx].items[iIdx].category?.caseInsensitiveCompare(oldName) == .orderedSame {
+                trips[tIdx].items[iIdx].category = trimmed
+                changed = true
+            }
+            if changed {
+                let snapshot = trips[tIdx]
+                Task { try? await persistence.saveTrip(snapshot) }
+            }
+        }
+
+        rebuildCaches()
+    }
+
+    private func persistCategories() {
+        let snapshot = categories
+        Task { try? await persistence.saveCategories(snapshot) }
+    }
+
+    /// On first launch (or after a fresh `.packit` directory), seed entries for
+    /// every unique category string used by any item, with icon/color from the
+    /// hardcoded `CategoryIcon` switch so visuals don't change.
+    /// Merge duplicate ItemCategory records (same name, case-insensitive) that
+    /// could exist from earlier rename-into-existing-target bugs. Keeps the
+    /// entry with the lowest rank so manual ordering is preserved.
+    private func dedupeCategories() {
+        var byKey: [String: ItemCategory] = [:]
+        for cat in categories {
+            let key = cat.name.lowercased()
+            if let existing = byKey[key] {
+                if cat.rank < existing.rank {
+                    byKey[key] = cat
+                }
+            } else {
+                byKey[key] = cat
+            }
+        }
+        if byKey.count < categories.count {
+            categories = Array(byKey.values)
+            persistCategories()
+        }
+    }
+
+    private func bootstrapCategoriesIfNeeded() {
+        var existingNames = Set(categories.map { $0.name.lowercased() })
+        var needsSave = false
+        let allUsedNames = uniqueCategoryNamesInData()
+        var nextRank = (categories.map(\.rank).max() ?? -1) + 1
+        for name in allUsedNames {
+            if existingNames.contains(name.lowercased()) { continue }
+            let icon = CategoryIcon.icon(for: name)
+            let colorToken = colorTokenFromHardcoded(for: name)
+            categories.append(ItemCategory(name: name, icon: icon, color: colorToken, rank: nextRank))
+            nextRank += 1
+            existingNames.insert(name.lowercased())
+            needsSave = true
+        }
+        if needsSave { persistCategories() }
+    }
+
+    // MARK: - Category sort & ordering
+
+    func setCategorySortMode(_ mode: CategorySortMode) {
+        guard localConfig.resolvedCategorySortMode != mode else { return }
+        localConfig.categorySortMode = mode
+        localConfig.save()
+    }
+
+    /// Returns category names ordered by the active sort mode. `extraNames`
+    /// covers categories used by items but not yet in the metadata store
+    /// (e.g. legacy strings) and "Uncategorized", which always sorts last.
+    func orderedCategoryNames(_ extraNames: Set<String>) -> [String] {
+        let mode = localConfig.resolvedCategorySortMode
+        // Start with metadata categories the items actually use.
+        let metaUsed = categories.filter { extraNames.contains($0.name) }
+        let metaNamesLower = Set(metaUsed.map { $0.name.lowercased() })
+        let extras = extraNames.filter {
+            $0 != "Uncategorized" && !metaNamesLower.contains($0.lowercased())
+        }
+        let sortedMeta: [String]
+        switch mode {
+        case .name:
+            sortedMeta = metaUsed
+                .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+                .map(\.name)
+        case .manual:
+            sortedMeta = metaUsed
+                .sorted { lhs, rhs in
+                    if lhs.rank != rhs.rank { return lhs.rank < rhs.rank }
+                    return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+                }
+                .map(\.name)
+        }
+        let sortedExtras = extras.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        var result = sortedMeta + sortedExtras
+        if extraNames.contains("Uncategorized") { result.append("Uncategorized") }
+        return result
+    }
+
+    /// Move a category (by name) so it sits immediately above `targetName`,
+    /// renumbering ranks across all categories. No-op for "Uncategorized" or
+    /// when source/target are the same.
+    func moveCategory(named sourceName: String, before targetName: String) {
+        guard sourceName != targetName,
+              sourceName != "Uncategorized",
+              targetName != "Uncategorized" else { return }
+        let sortedAll = categories.sorted { lhs, rhs in
+            if lhs.rank != rhs.rank { return lhs.rank < rhs.rank }
+            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
+        guard let srcIdx = sortedAll.firstIndex(where: { $0.name.caseInsensitiveCompare(sourceName) == .orderedSame }),
+              let dstIdx = sortedAll.firstIndex(where: { $0.name.caseInsensitiveCompare(targetName) == .orderedSame }) else { return }
+        var working = sortedAll
+        let moved = working.remove(at: srcIdx)
+        let insertAt = srcIdx < dstIdx ? dstIdx - 1 : dstIdx
+        working.insert(moved, at: insertAt)
+        for (i, cat) in working.enumerated() {
+            if let storeIdx = categories.firstIndex(where: { $0.id == cat.id }) {
+                categories[storeIdx].rank = i
+            }
+        }
+        persistCategories()
+    }
+
+    private func uniqueCategoryNamesInData() -> [String] {
+        var seen = Set<String>()
+        var ordered: [String] = []
+        for t in templates {
+            for item in t.items {
+                if let c = item.category, !c.isEmpty, !seen.contains(c.lowercased()) {
+                    seen.insert(c.lowercased())
+                    ordered.append(c)
+                }
+            }
+        }
+        for trip in trips {
+            for item in trip.items {
+                if let c = item.category, !c.isEmpty, !seen.contains(c.lowercased()) {
+                    seen.insert(c.lowercased())
+                    ordered.append(c)
+                }
+            }
+        }
+        return ordered.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    /// Map the hardcoded CategoryIcon's color (a SwiftUI Color) onto the
+    /// closest CategoryColor token. Imperfect — done by name match.
+    private func colorTokenFromHardcoded(for name: String) -> String {
+        switch name.lowercased() {
+        case "documents": return CategoryColor.blue.rawValue
+        case "electronics", "lighting", "skin": return CategoryColor.yellow.rawValue
+        case "health", "safety", "fire": return CategoryColor.red.rawValue
+        case "food", "tools", "storage", "cooking": return CategoryColor.orange.rawValue
+        case "accessories", "entertainment", "cosmetics", "formal", "footwear", "bags": return CategoryColor.purple.rawValue
+        case "basics", "clothing", "layers": return CategoryColor.indigo.rawValue
+        case "activity wear", "fishing gear": return CategoryColor.mint.rawValue
+        case "hair", "dental", "beach gear", "vision", "water sports", "water": return CategoryColor.cyan.rawValue
+        case "shelter", "comfort", "cleanup", "navigation", "skin care": return CategoryColor.green.rawValue
+        case "body": return CategoryColor.teal.rawValue
+        case "grooming", "bags ": return CategoryColor.pink.rawValue
+        case "misc": return CategoryColor.gray.rawValue
+        default: return CategoryColor.gray.rawValue
+        }
     }
 
     // MARK: - Tag Management

@@ -13,6 +13,7 @@ struct TripEditorSheet: View {
     @State private var scratchNotes: String = ""
     @State private var status: TripStatus = .planning
     @State private var members: [String] = []
+    @State private var travelMode: TravelMode = .plane
 
     var body: some View {
         FormSheet(width: 500, height: 500) {
@@ -39,6 +40,11 @@ struct TripEditorSheet: View {
                     }
                 }
                 DestinationField(destination: $destination)
+                Picker("Travel Mode", selection: $travelMode) {
+                    ForEach(TravelMode.allCases) { mode in
+                        Label(mode.label, systemImage: mode.symbol).tag(mode)
+                    }
+                }
                 Picker("Status", selection: $status) {
                     ForEach(TripStatus.allCases, id: \.self) { s in
                         Label(s.label, systemImage: s.icon).tag(s)
@@ -74,6 +80,7 @@ struct TripEditorSheet: View {
             scratchNotes = trip.scratchNotes
             status = trip.status
             members = trip.members
+            travelMode = trip.travelMode
         }
     }
 
@@ -87,6 +94,7 @@ struct TripEditorSheet: View {
         updated.scratchNotes = scratchNotes
         updated.status = status
         updated.members = members
+        updated.travelMode = travelMode
         store.updateTrip(updated)
         dismiss()
     }

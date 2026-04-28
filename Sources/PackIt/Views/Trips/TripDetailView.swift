@@ -1,25 +1,47 @@
 import SwiftUI
 import AppKit
 
+/// Drag payload prefix for category-reorder drags. Item drops are bare UUIDs,
+/// which can't collide with this prefix — single dropDestination handles both.
+private let categoryDragPrefix = "__pkcat__:"
+
 struct TripDetailView: View {
     @Environment(PackItStore.self) private var store
+    @Environment(\.colorScheme) private var colorScheme
     let trip: TripInstance
     @State private var activeSheet: TripSheet?
     @State private var pendingReminders = 0
     @State private var showInspector = true
     @State private var newTodoText = ""
     @State private var viewMode: TripViewMode = .packing
-    @State private var memberFilter: Set<String> = []
-    @State private var didSeedMemberFilter = false
+    @State private var prepDragStartWidth: CGFloat?
     @State private var editingItem: TripItem?
+
+    // memberFilter and prepWidth live on the store so they survive view re-creation
+    // (notably when toggling fullscreen, which re-mounts TripDetailView).
+    private var memberFilter: Set<String> {
+        store.tripUI(trip.id).memberFilter ?? Set(trip.members)
+    }
+
+    private var prepWidth: CGFloat {
+        store.tripUI(trip.id).prepWidth
+    }
     @State private var selectedItemIDs: Set<UUID> = []
     @State private var lastClickedItemID: UUID?
     @State private var showSearch = false
     @State private var searchQuery = ""
     @State private var currentMatchIndex = 0
     @State private var keyMonitor: Any?
-    @FocusState private var searchFocused: Bool
+    @State private var searchFocused: Bool = false
+    @State private var searchSuggestionsDismissed = false
+    @State private var selectedSuggestionIndex: Int = -1
+    @State private var searchRefocusToken: Int = 0
+    @State private var isCyclingSearchSuggestion = false
+    @State private var searchOutsideClickMonitor: Any? = nil
     @State private var scrollProxy: ScrollViewProxy?
+    @State private var searchFieldFrame: CGRect = .zero
+    @State private var draggingCategory: String?
+    @State private var dropTargetCategory: String?
 
     enum TripViewMode: String, CaseIterable {
         case packing = "Packing"
@@ -49,7 +71,7 @@ struct TripDetailView: View {
                     .padding(.horizontal)
                     .padding(.top, 10)
 
-                HStack {
+                HStack(alignment: .top) {
                     Picker("View", selection: $viewMode) {
                         ForEach(TripViewMode.allCases, id: \.self) { mode in
                             Text(mode.rawValue).tag(mode)
@@ -61,6 +83,24 @@ struct TripDetailView: View {
                     Spacer()
                     if showSearch && viewMode == .packing {
                         searchField
+                            .onGeometryChange(for: CGRect.self) { geo in
+                                geo.frame(in: .global)
+                            } action: { newFrame in
+                                searchFieldFrame = newFrame
+                            }
+                            .background(
+                                AnchoredSuggestionPopup(
+                                    isVisible: .constant(isSearchDropdownVisible),
+                                    anchorFrame: searchFieldFrame,
+                                    width: max(searchFieldFrame.width, 280),
+                                    height: searchDropdownHeight,
+                                    gap: 4,
+                                    horizontalAlignment: .trailing
+                                ) {
+                                    searchDropdownContent
+                                        .environment(\.colorScheme, colorScheme)
+                                }
+                            )
                             .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
                 }
@@ -85,8 +125,8 @@ struct TripDetailView: View {
                 HStack(alignment: .top, spacing: 0) {
                     if !trip.prepTasks.isEmpty {
                         prepTaskTimeline
-                            .frame(width: 220)
-                        Divider()
+                            .frame(width: prepWidth)
+                        prepResizer
                     }
 
                     ScrollView {
@@ -118,6 +158,30 @@ struct TripDetailView: View {
                 MealPlanView(trip: trip)
             } else {
                 ProcedureChecklistView(trip: trip)
+            }
+        }
+        .onPreferenceChange(SearchFieldFramePreferenceKey.self) { frame in
+            searchFieldFrame = frame
+        }
+        .onChange(of: searchFocused) { _, focused in
+            // Re-focusing the field (e.g. user clicks back in) clears the
+            // dismissal so suggestions return as they keep typing.
+            if focused {
+                searchSuggestionsDismissed = false
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .packitOpenTripSearch)) { _ in
+            // Edit > Find… (Cmd-F): force-resign any focused field, then open.
+            if let window = NSApp.keyWindow, window.firstResponder is NSTextView {
+                window.makeFirstResponder(nil)
+            }
+            if !showSearch { openSearch() } else { searchSuggestionsDismissed = false }
+        }
+        .onChange(of: isSearchDropdownVisible) { _, visible in
+            if visible {
+                installSearchOutsideClickMonitor()
+            } else {
+                removeSearchOutsideClickMonitor()
             }
         }
         .accessibilityIdentifier("tripDetail")
@@ -217,19 +281,27 @@ struct TripDetailView: View {
                     activeSheet = .reviewItems
                 }
             }
-            if !didSeedMemberFilter {
-                memberFilter = Set(trip.members)
-                didSeedMemberFilter = true
+            if store.tripUI(trip.id).memberFilter == nil {
+                store.setTripMemberFilter(Set(trip.members), for: trip.id)
             }
             installSearchKeyMonitor()
         }
         .onDisappear { removeSearchKeyMonitor() }
         .onChange(of: trip.members) { _, newMembers in
             // Drop members no longer present; auto-include any newly-added members.
-            memberFilter = memberFilter.intersection(Set(newMembers)).union(Set(newMembers))
+            let updated = memberFilter.intersection(Set(newMembers)).union(Set(newMembers))
+            store.setTripMemberFilter(updated, for: trip.id)
         }
         .onChange(of: searchQuery) { _, _ in
             currentMatchIndex = 0
+            // Don't reset suggestion selection when the change came from
+            // Tab/arrow cycling (otherwise cycling always returns to top).
+            if !isCyclingSearchSuggestion {
+                selectedSuggestionIndex = -1
+                searchSuggestionsDismissed = false
+                cycleAnchorSuggestions = nil
+            }
+            isCyclingSearchSuggestion = false
             scrollToCurrentMatch()
         }
     }
@@ -257,9 +329,15 @@ struct TripDetailView: View {
                     }
                 }
                 HStack(spacing: 16) {
-                    Label(trip.departureDate.formatted(date: .long, time: .omitted), systemImage: "airplane.departure")
+                    HStack(spacing: 5) {
+                        TravelHeaderIcon(mode: trip.travelMode, direction: .departure)
+                        Text(trip.departureDate.formatted(date: .long, time: .omitted))
+                    }
                     if let ret = trip.returnDate {
-                        Label(ret.formatted(date: .long, time: .omitted), systemImage: "airplane.arrival")
+                        HStack(spacing: 5) {
+                            TravelHeaderIcon(mode: trip.travelMode, direction: .arrival)
+                            Text(ret.formatted(date: .long, time: .omitted))
+                        }
                     }
                 }
                 .font(.subheadline)
@@ -355,22 +433,41 @@ struct TripDetailView: View {
         memberFilter.count > 1
     }
 
+    private var orderedCategoryKeys: [String] {
+        let grouped = Dictionary(grouping: visiblePackingItems, by: { $0.category ?? "Uncategorized" })
+        return store.orderedCategoryNames(Set(grouped.keys))
+    }
+
     private var orderedVisibleItems: [TripItem] {
         let grouped = Dictionary(grouping: visiblePackingItems, by: { $0.category ?? "Uncategorized" })
-        let sortedKeys = grouped.keys.sorted()
-        return sortedKeys.flatMap { grouped[$0] ?? [] }
+        return orderedCategoryKeys.flatMap { grouped[$0] ?? [] }
     }
 
     private var packingSection: some View {
         let grouped = Dictionary(grouping: visiblePackingItems, by: { $0.category ?? "Uncategorized" })
-        let sortedKeys = grouped.keys.sorted()
+        let sortedKeys = orderedCategoryKeys
         let ordered = orderedVisibleItems
+        let sortMode = store.localConfig.resolvedCategorySortMode
 
         return VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("Packing List")
                     .font(.headline)
                 Spacer()
+                Button {
+                    store.setCategorySortMode(sortMode == .name ? .manual : .name)
+                } label: {
+                    HStack(spacing: 3) {
+                        Text(sortMode == .manual ? "Manual" : "Name")
+                            .font(.caption)
+                        Image(systemName: sortMode == .manual ? "line.3.horizontal" : "textformat.abc")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Category sort: click to switch (\(sortMode == .manual ? "Manual" : "Name"))")
+
                 Button { activeSheet = .editItems } label: {
                     Label("Edit List", systemImage: "pencil.line")
                         .font(.caption)
@@ -400,6 +497,21 @@ struct TripDetailView: View {
                     selectedItemIDs: selectedItemIDs,
                     searchMatchIDs: searchMatchSet,
                     currentSearchMatchID: currentMatchID,
+                    isReorderable: sortMode == .manual,
+                    isDragging: draggingCategory == category,
+                    isDropTarget: dropTargetCategory == category,
+                    onCategoryDragStart: { draggingCategory = category },
+                    onCategoryDragEnd: {
+                        draggingCategory = nil
+                        dropTargetCategory = nil
+                    },
+                    onCategoryDropTargetChanged: { isTargeted in
+                        if isTargeted {
+                            dropTargetCategory = category
+                        } else if dropTargetCategory == category {
+                            dropTargetCategory = nil
+                        }
+                    },
                     onEdit: { item in editingItem = item },
                     onSelect: { item, modifiers in
                         handleItemClick(item: item, modifiers: modifiers, ordered: ordered)
@@ -513,17 +625,109 @@ struct TripDetailView: View {
         lastClickedItemID = nil
     }
 
+    // MARK: - Prep column resizer
+
+    @ViewBuilder
+    private var prepResizer: some View {
+        // Visual: 1pt divider — minimal gap.
+        // Hit area: 10pt-wide overlay that doesn't consume layout space.
+        Divider()
+            .overlay {
+                Rectangle()
+                    .fill(Color.clear)
+                    .frame(width: 10)
+                    .contentShape(Rectangle())
+                    .onHover { hovering in
+                        if hovering {
+                            NSCursor.resizeLeftRight.set()
+                        } else {
+                            NSCursor.arrow.set()
+                        }
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                            .onChanged { value in
+                                if prepDragStartWidth == nil {
+                                    prepDragStartWidth = prepWidth
+                                }
+                                let proposed = (prepDragStartWidth ?? prepWidth) + value.translation.width
+                                store.setTripPrepWidth(max(160, min(500, proposed)), for: trip.id)
+                            }
+                            .onEnded { _ in prepDragStartWidth = nil }
+                    )
+            }
+    }
+
     // MARK: - Search
 
     private var searchMatchIDs: [UUID] {
-        let q = searchQuery.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !q.isEmpty else { return [] }
+        let raw = searchQuery.trimmingCharacters(in: .whitespaces)
+        guard !raw.isEmpty else { return [] }
+        let tokens = parseSearchTokens(raw)
         return orderedVisibleItems.compactMap { item in
-            let hay = [item.name, item.category ?? "", item.notes ?? "", item.owner ?? ""]
-                .joined(separator: " ")
-                .lowercased()
-            return hay.contains(q) ? item.id : nil
+            tokens.allSatisfy { $0.matches(item) } ? item.id : nil
         }
+    }
+
+    private struct SearchToken {
+        enum Field { case any, name, category, owner, notes, priority, packed }
+        let field: Field
+        let needle: String
+
+        func matches(_ item: TripItem) -> Bool {
+            switch field {
+            case .any:
+                let hay = [item.name, item.category ?? "", item.notes ?? "", item.owner ?? ""]
+                    .joined(separator: " ")
+                    .lowercased()
+                return hay.contains(needle)
+            case .name:     return item.name.lowercased().contains(needle)
+            case .category: return (item.category ?? "").lowercased().contains(needle)
+            case .owner:    return (item.owner ?? "").lowercased().contains(needle)
+            case .notes:    return (item.notes ?? "").lowercased().contains(needle)
+            case .priority:
+                let label = item.priority.label.lowercased()
+                let raw = item.priority.rawValue.lowercased()
+                return label.contains(needle) || raw.contains(needle)
+            case .packed:
+                let truthy = ["yes", "y", "true", "1", "packed"]
+                let falsy = ["no", "n", "false", "0", "unpacked"]
+                if truthy.contains(needle) { return item.isPacked }
+                if falsy.contains(needle) { return !item.isPacked }
+                return false
+            }
+        }
+    }
+
+    private func parseSearchTokens(_ raw: String) -> [SearchToken] {
+        var tokens: [SearchToken] = []
+        for chunk in raw.split(whereSeparator: \.isWhitespace) {
+            var s = String(chunk)
+            if let colon = s.firstIndex(of: ":") {
+                let key = s[..<colon].lowercased()
+                var val = String(s[s.index(after: colon)...])
+                if val.hasPrefix("\"") { val.removeFirst(); if val.hasSuffix("\"") { val.removeLast() } }
+                let field: SearchToken.Field?
+                switch key {
+                case "name", "n":            field = .name
+                case "category", "cat", "c": field = .category
+                case "owner", "o":           field = .owner
+                case "notes", "note":        field = .notes
+                case "priority", "pri":      field = .priority
+                case "packed":               field = .packed
+                default:                     field = nil
+                }
+                if let field, !val.isEmpty {
+                    tokens.append(SearchToken(field: field, needle: val.lowercased()))
+                    continue
+                }
+            }
+            if s.hasPrefix("\"") { s.removeFirst(); if s.hasSuffix("\"") { s.removeLast() } }
+            if !s.isEmpty {
+                tokens.append(SearchToken(field: .any, needle: s.lowercased()))
+            }
+        }
+        return tokens
     }
 
     private var searchMatchSet: Set<UUID> { Set(searchMatchIDs) }
@@ -540,21 +744,33 @@ struct TripDetailView: View {
             Image(systemName: "magnifyingglass")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            TextField("Find in list…", text: $searchQuery)
-                .textFieldStyle(.plain)
-                .font(.callout)
-                .frame(width: 160)
-                .focused($searchFocused)
-                .onSubmit { advanceMatch(by: 1) }
-            if !searchMatchIDs.isEmpty {
-                Text("\(currentMatchIndex + 1)/\(searchMatchIDs.count)")
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            } else if !searchQuery.isEmpty {
-                Text("0")
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.tertiary)
+            TokenizedSearchField(
+                text: $searchQuery,
+                placeholder: "Find in list…  (try category:Bath)",
+                isFocused: $searchFocused,
+                autoFocus: true,
+                refocusToken: searchRefocusToken,
+                onAdvance: { forward in cycleSuggestion(forward: forward) },
+                onSubmit: { handleSearchSubmit() },
+                onCancel: { handleSearchCancel() }
+            )
+            .frame(width: 220, height: 18)
+            // Fixed-width counter slot prevents the field from re-laying out
+            // (and the dropdown anchor from jumping) as matches/digits change.
+            Group {
+                if !searchMatchIDs.isEmpty {
+                    Text("\(currentMatchIndex + 1)/\(searchMatchIDs.count)")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                } else if !searchQuery.isEmpty {
+                    Text("0")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                } else {
+                    Text(" ").font(.caption2.monospacedDigit())
+                }
             }
+            .frame(width: 48, alignment: .trailing)
             Button { advanceMatch(by: -1) } label: {
                 Image(systemName: "chevron.up")
                     .font(.caption)
@@ -584,6 +800,204 @@ struct TripDetailView: View {
         .padding(.vertical, 4)
         .background(Color.secondary.opacity(0.10))
         .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    private var isSearchDropdownVisible: Bool {
+        showSearch && !searchSuggestionsDismissed && !searchSuggestions.isEmpty
+    }
+
+    private func installSearchOutsideClickMonitor() {
+        guard searchOutsideClickMonitor == nil else { return }
+        searchOutsideClickMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
+            // Defer the dismissal so suggestion-row clicks still get to fire
+            // their button action (which runs synchronously on the same event
+            // loop tick before this async block).
+            DispatchQueue.main.async {
+                searchSuggestionsDismissed = true
+                selectedSuggestionIndex = -1
+                cycleAnchorSuggestions = nil
+            }
+            return event
+        }
+    }
+
+    private func removeSearchOutsideClickMonitor() {
+        if let m = searchOutsideClickMonitor {
+            NSEvent.removeMonitor(m)
+            searchOutsideClickMonitor = nil
+        }
+    }
+
+    private var searchDropdownHeight: CGFloat {
+        min(CGFloat(searchSuggestions.count) * 28 + 8, 260)
+    }
+
+    @ViewBuilder
+    private var searchDropdownContent: some View {
+        let bg: Color = colorScheme == .dark
+            ? Color(red: 0.16, green: 0.16, blue: 0.18)
+            : Color(red: 0.98, green: 0.98, blue: 0.98)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(searchSuggestions.enumerated()), id: \.offset) { index, suggestion in
+                    Button {
+                        acceptSuggestion(suggestion)
+                    } label: {
+                        Text(suggestion)
+                            .font(.callout)
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 5)
+                            .padding(.horizontal, 10)
+                            .background(index == selectedSuggestionIndex ? Color.packitTeal.opacity(0.25) : .clear)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .focusable(false)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+        .background(bg)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator, lineWidth: 0.5))
+    }
+
+    // MARK: - Search suggestions
+
+    private static let searchFieldKeys: [String] = [
+        "category:", "owner:", "name:", "priority:", "packed:", "notes:"
+    ]
+
+    private var searchActiveWord: (start: String.Index, value: String) {
+        if let lastWS = searchQuery.lastIndex(where: { $0.isWhitespace }) {
+            let start = searchQuery.index(after: lastWS)
+            return (start, String(searchQuery[start...]))
+        }
+        return (searchQuery.startIndex, searchQuery)
+    }
+
+    private var searchSuggestions: [String] {
+        // While a cycle is active (anchor non-nil), keep showing the anchored
+        // list so the dropdown doesn't shrink to only the currently-previewed
+        // item between Tab presses.
+        if let anchored = cycleAnchorSuggestions {
+            return anchored
+        }
+        return computeSuggestions(for: searchActiveWord.value)
+    }
+
+    @State private var cycleAnchorSuggestions: [String]? = nil
+
+    private func computeSuggestions(for active: String) -> [String] {
+        let lowerActive = active.lowercased()
+
+        if let colonIdx = active.firstIndex(of: ":") {
+            let key = String(active[..<colonIdx]).lowercased()
+            let valueQuery = String(active[active.index(after: colonIdx)...]).lowercased()
+            // Values use contains-style matching (search semantics).
+            return suggestionValues(forFieldKey: key)
+                .filter { valueQuery.isEmpty || $0.lowercased().contains(valueQuery) }
+                .prefix(20)
+                .map { "\(key):\($0)" }
+        }
+
+        // Field keys keep prefix matching — they're a small fixed set, prefix is what
+        // people expect when the cursor is at the start of a token.
+        if lowerActive.isEmpty {
+            return Self.searchFieldKeys
+        }
+        return Self.searchFieldKeys.filter { $0.hasPrefix(lowerActive) }
+    }
+
+    private func suggestionValues(forFieldKey key: String) -> [String] {
+        switch key {
+        case "category", "cat", "c":
+            let used = Set(trip.items.compactMap { $0.category })
+            return used.sorted()
+        case "owner", "o":
+            return trip.members
+        case "name", "n":
+            return Array(Set(trip.items.map(\.name))).sorted()
+        case "priority", "pri":
+            return ["low", "medium", "high", "critical"]
+        case "packed":
+            return ["yes", "no"]
+        case "notes", "note":
+            return []   // free-form
+        default:
+            return []
+        }
+    }
+
+    private func cycleSuggestion(forward: Bool) {
+        // Snapshot suggestions on first cycle press so the list stays stable
+        // even as the field's text changes during preview.
+        if cycleAnchorSuggestions == nil {
+            cycleAnchorSuggestions = computeSuggestions(for: searchActiveWord.value)
+        }
+        guard let list = cycleAnchorSuggestions, !list.isEmpty else { return }
+        searchSuggestionsDismissed = false
+        if forward {
+            selectedSuggestionIndex = (selectedSuggestionIndex + 1) % list.count
+        } else {
+            selectedSuggestionIndex = (selectedSuggestionIndex - 1 + list.count) % list.count
+        }
+        let suggestion = list[selectedSuggestionIndex]
+        isCyclingSearchSuggestion = true
+        replaceActiveWord(with: suggestion, addTrailingSpace: false)
+    }
+
+    private func handleSearchSubmit() {
+        // If a suggestion is currently selected, accepting Enter commits it
+        // (already in the field via Tab/arrow preview). Add a trailing space
+        // ONLY for value completions; key completions (ending in ":") expect
+        // the user to keep typing the value directly.
+        if selectedSuggestionIndex >= 0 && !searchSuggestionsDismissed {
+            let endsWithKey = searchQuery.hasSuffix(":")
+            if !endsWithKey && !searchQuery.hasSuffix(" ") {
+                searchQuery += " "
+            }
+            selectedSuggestionIndex = -1
+            cycleAnchorSuggestions = nil
+            // Value commit: dismiss until the user types or Tabs again.
+            // Key commit: keep open — the values list should pop immediately.
+            if !endsWithKey {
+                searchSuggestionsDismissed = true
+            }
+            return
+        }
+        // Else, advance to the next match (existing behavior).
+        advanceMatch(by: 1)
+    }
+
+    private func handleSearchCancel() {
+        if !searchSuggestionsDismissed && !searchSuggestions.isEmpty {
+            // Dismiss suggestions, keep field open.
+            searchSuggestionsDismissed = true
+            selectedSuggestionIndex = -1
+        } else {
+            dismissSearch()
+        }
+    }
+
+    private func acceptSuggestion(_ suggestion: String) {
+        let isValue = !suggestion.hasSuffix(":")
+        replaceActiveWord(with: suggestion, addTrailingSpace: isValue)
+        selectedSuggestionIndex = -1
+        cycleAnchorSuggestions = nil
+        if isValue {
+            searchSuggestionsDismissed = true
+        }
+        // Click on a suggestion row briefly steals first-responder; restore it.
+        searchRefocusToken &+= 1
+    }
+
+    private func replaceActiveWord(with value: String, addTrailingSpace: Bool) {
+        let start = searchActiveWord.start
+        var newQuery = String(searchQuery[..<start]) + value
+        if addTrailingSpace { newQuery += " " }
+        searchQuery = newQuery
     }
 
     private func openSearch() {
@@ -627,13 +1041,22 @@ struct TripDetailView: View {
     }
 
     private func handleSearchKey(_ event: NSEvent) -> Bool {
-        // Ignore when a text field elsewhere has focus.
         let textViewFocused = event.window?.firstResponder is NSTextView
         let chars = event.charactersIgnoringModifiers ?? ""
         let mods = event.modifierFlags
         let hasNonShiftModifier = mods.intersection([.command, .control, .option]).isEmpty == false
 
-        // "/" toggles search — only when no text field has focus.
+        // ⌘F — universal "open search" shortcut. Force-resigns whatever field has
+        // focus (notes, todos, activities, etc.) and opens search. Use this when
+        // you can't get out of another field with click-outside.
+        if chars.lowercased() == "f" && mods.contains(.command) && !mods.contains(.shift) && !mods.contains(.option) && !mods.contains(.control) {
+            if textViewFocused { event.window?.makeFirstResponder(nil) }
+            if !showSearch { openSearch() } else { searchSuggestionsDismissed = false }
+            return true
+        }
+
+        // "/" toggles search — only when no text field has focus, so notes/todos/
+        // activities can still contain a "/" character.
         if chars == "/" && !textViewFocused && !hasNonShiftModifier {
             if showSearch { dismissSearch() } else { openSearch() }
             return true
@@ -687,11 +1110,9 @@ struct TripDetailView: View {
             ForEach(trip.members, id: \.self) { member in
                 let included = memberFilter.contains(member)
                 Button {
-                    if included {
-                        memberFilter.remove(member)
-                    } else {
-                        memberFilter.insert(member)
-                    }
+                    var f = memberFilter
+                    if included { f.remove(member) } else { f.insert(member) }
+                    store.setTripMemberFilter(f, for: trip.id)
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: included ? "checkmark.square.fill" : "square")
@@ -771,7 +1192,7 @@ struct TripDetailView: View {
                                 Circle()
                                     .strokeBorder(.packitTeal.opacity(0.35), lineWidth: 1.2)
                                     .frame(width: 24, height: 24)
-                                Image(systemName: timing.icon)
+                                Image(systemName: timing.icon(for: trip.travelMode))
                                     .font(.system(size: 9, weight: .medium))
                                     .foregroundStyle(.packitTeal)
                             }
@@ -881,6 +1302,15 @@ struct CategorySection: View {
     var selectedItemIDs: Set<UUID> = []
     var searchMatchIDs: Set<UUID> = []
     var currentSearchMatchID: UUID?
+    /// In manual sort mode, the header gets a drag handle and accepts
+    /// other-category drops to reorder the list. In name mode it's hidden
+    /// and only item drops are accepted.
+    var isReorderable: Bool = false
+    var isDragging: Bool = false
+    var isDropTarget: Bool = false
+    var onCategoryDragStart: () -> Void = {}
+    var onCategoryDragEnd: () -> Void = {}
+    var onCategoryDropTargetChanged: (Bool) -> Void = { _ in }
     var onEdit: (TripItem) -> Void = { _ in }
     var onSelect: (TripItem, EventModifiers) -> Void = { _, _ in }
     var onBulkSetOwner: (String?) -> Void = { _ in }
@@ -890,8 +1320,8 @@ struct CategorySection: View {
     @State private var isRenaming = false
     @State private var renameText = ""
     @State private var isHeaderDropTargeted = false
-    @State private var didCancelRename = false
-    @FocusState private var isRenameFocused: Bool
+    @State private var isRenameFocused: Bool = false
+    @State private var showIconPicker = false
 
     private var packedCount: Int { items.filter(\.isPacked).count }
     private var allPacked: Bool { !items.isEmpty && packedCount == items.count }
@@ -901,13 +1331,65 @@ struct CategorySection: View {
     private func commitRename() {
         let trimmed = renameText.trimmingCharacters(in: .whitespaces)
         isRenaming = false
-        guard !trimmed.isEmpty, trimmed != category else { return }
-        store.renameCategory(in: tripID, from: categoryForStore, to: trimmed)
+        guard !trimmed.isEmpty, trimmed != category, category != "Uncategorized" else { return }
+        // Global rename so the picklist, settings, and other trips update too.
+        store.renameCategoryGlobally(from: category, to: trimmed)
     }
 
+    private var canReorder: Bool { isReorderable && category != "Uncategorized" }
+
     var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            categoryDropStrip
+            sectionBody
+                .opacity(isDragging ? 0.35 : 1.0)
+        }
+        .background(isAlternate ? Color.secondary.opacity(0.04) : .clear)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .animation(.easeInOut(duration: 0.15), value: isDropTarget)
+        .animation(.easeInOut(duration: 0.15), value: isDragging)
+    }
+
+    /// Thin drop zone above each section that catches category-reorder drags.
+    /// When targeted, renders a teal capsule line as an insertion mark.
+    @ViewBuilder
+    private var categoryDropStrip: some View {
+        let active = canReorder
+        if active {
+            ZStack {
+                if isDropTarget {
+                    Capsule()
+                        .fill(Color.packitTeal)
+                        .frame(height: 3)
+                        .padding(.horizontal, 12)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: isDropTarget ? 14 : 8)
+            .contentShape(Rectangle())
+            .dropDestination(for: String.self) { dropped, _ in
+                defer { onCategoryDragEnd() }
+                guard let payload = dropped.first,
+                      payload.hasPrefix(categoryDragPrefix) else { return false }
+                let name = String(payload.dropFirst(categoryDragPrefix.count))
+                store.moveCategory(named: name, before: category)
+                return true
+            } isTargeted: { onCategoryDropTargetChanged($0) }
+        }
+    }
+
+    @ViewBuilder
+    private var sectionBody: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
+                if canReorder {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 14)
+                        .help("Drag header to reorder this category")
+                }
+
                 Button {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         store.setAllPacked(tripID: tripID, category: category, packed: !allPacked)
@@ -925,32 +1407,36 @@ struct CategorySection: View {
                 .buttonStyle(.plain)
                 .help(allPacked ? "Unpack all in \(category)" : "Pack all in \(category)")
 
-                Image(systemName: CategoryIcon.icon(for: category))
+                Image(systemName: store.categoryIcon(for: category))
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(CategoryIcon.color(for: category))
+                    .foregroundStyle(store.categoryColor(for: category))
                     .frame(width: 16)
+                    .contentShape(Rectangle())
+                    .help("Double-click to change icon")
+                    .onTapGesture(count: 2) { showIconPicker = true }
+                    .popover(isPresented: $showIconPicker, arrowEdge: .bottom) {
+                        InlineCategoryIconColorEditor(
+                            categoryName: category,
+                            onCommit: { isOpen in showIconPicker = isOpen }
+                        )
+                    }
 
                 if isRenaming {
-                    TextField("Category", text: $renameText)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 12, weight: .bold))
-                        .frame(maxWidth: 180)
-                        .focused($isRenameFocused)
-                        .onSubmit { commitRename() }
-                        .onExitCommand {
-                            didCancelRename = true
-                            isRenaming = false
+                    LeadingTextField(
+                        label: "Category",
+                        text: $renameText,
+                        isFocused: $isRenameFocused,
+                        autoFocus: true
+                    )
+                    .frame(width: 180, height: 22)
+                    .onChange(of: isRenameFocused) { _, focused in
+                        // NSTextField's controlTextDidEndEditing fires on Enter, Tab,
+                        // click-outside, and Esc. Esc reverts the text first, so
+                        // commitRename naturally no-ops in that case.
+                        if !focused && isRenaming {
+                            commitRename()
                         }
-                        .onChange(of: isRenameFocused) { _, focused in
-                            if !focused && isRenaming {
-                                if didCancelRename {
-                                    didCancelRename = false
-                                    isRenaming = false
-                                } else {
-                                    commitRename()
-                                }
-                            }
-                        }
+                    }
                 } else {
                     Text(category.uppercased())
                         .font(.system(size: 12, weight: .bold))
@@ -958,9 +1444,8 @@ struct CategorySection: View {
                         .tracking(0.5)
                         .onTapGesture(count: 2) {
                             renameText = category == "Uncategorized" ? "" : category
-                            didCancelRename = false
                             isRenaming = true
-                            DispatchQueue.main.async { isRenameFocused = true }
+                            // LeadingTextField with autoFocus: true takes focus + selects all.
                         }
                         .help("Double-click to rename")
                 }
@@ -974,9 +1459,15 @@ struct CategorySection: View {
             .padding(.vertical, 4)
             .background(isHeaderDropTargeted ? Color.packitTeal.opacity(0.15) : .clear)
             .clipShape(RoundedRectangle(cornerRadius: 6))
-            .dropDestination(for: String.self) { droppedIDs, _ in
-                guard let droppedID = droppedIDs.first,
-                      let draggedUUID = UUID(uuidString: droppedID) else { return false }
+            .modifier(CategoryHeaderDragModifier(
+                category: category,
+                canReorder: canReorder,
+                onStart: onCategoryDragStart
+            ))
+            .dropDestination(for: String.self) { dropped, _ in
+                guard let payload = dropped.first,
+                      !payload.hasPrefix(categoryDragPrefix),
+                      let draggedUUID = UUID(uuidString: payload) else { return false }
                 store.moveTripItem(in: tripID, itemID: draggedUUID, toCategory: categoryForStore)
                 return true
             } isTargeted: { isHeaderDropTargeted = $0 }
@@ -1010,8 +1501,30 @@ struct CategorySection: View {
             .padding(.horizontal, 4)
             .padding(.bottom, 8)
         }
-        .background(isAlternate ? Color.secondary.opacity(0.04) : .clear)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private struct CategoryHeaderDragModifier: ViewModifier {
+    let category: String
+    let canReorder: Bool
+    let onStart: () -> Void
+
+    func body(content: Content) -> some View {
+        if canReorder {
+            content.draggable(categoryDragPrefix + category) {
+                // Custom preview signals drag start so the parent can dim the
+                // source section and reserve space in the drop strips below.
+                Text(category)
+                    .font(.callout.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .onAppear { onStart() }
+            }
+        } else {
+            content
+        }
     }
 }
 
@@ -1418,9 +1931,9 @@ struct TripInspectorView: View {
 
             if !infoCollapsed {
             VStack(spacing: 6) {
-                infoRow(icon: "airplane.departure", label: "Departure", value: trip.departureDate.formatted(date: .long, time: .omitted))
+                infoRow(icon: trip.travelMode.departureSymbol, label: "Departure", value: trip.departureDate.formatted(date: .long, time: .omitted))
                 if let ret = trip.returnDate {
-                    infoRow(icon: "airplane.arrival", label: "Return", value: ret.formatted(date: .long, time: .omitted))
+                    infoRow(icon: trip.travelMode.arrivalSymbol, label: "Return", value: ret.formatted(date: .long, time: .omitted))
                 }
                 infoRow(icon: "suitcase", label: "Status", value: trip.status.label)
                 infoRow(icon: "number", label: "Items", value: "\(trip.totalItems)")
