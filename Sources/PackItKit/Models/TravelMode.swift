@@ -3,7 +3,7 @@ import Foundation
 /// How the user is traveling for a given trip. Drives travel-related icons
 /// (prep timeline "Day Of"/"On Return" nodes, trip header date rows, etc.).
 /// Persisted on `TripInstance`; defaults to `.plane` for older trips.
-enum TravelMode: String, Codable, CaseIterable, Sendable, Identifiable {
+public enum TravelMode: String, Codable, CaseIterable, Sendable, Identifiable {
     case plane
     case car
     case train
@@ -13,9 +13,9 @@ enum TravelMode: String, Codable, CaseIterable, Sendable, Identifiable {
     case bicycle
     case walking
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var label: String {
+    public var label: String {
         switch self {
         case .plane: "Plane"
         case .car: "Car"
@@ -30,7 +30,7 @@ enum TravelMode: String, Codable, CaseIterable, Sendable, Identifiable {
 
     /// Generic SF Symbol shown in pickers / labels. Side-profile variants
     /// chosen where they exist so the icon reads as moving forward.
-    var symbol: String {
+    public var symbol: String {
         switch self {
         case .plane: "airplane"
         case .car: "car.side.fill"
@@ -45,7 +45,7 @@ enum TravelMode: String, Codable, CaseIterable, Sendable, Identifiable {
 
     /// True when the symbol shows the vehicle in side profile, so trailing
     /// speed lines visually make sense beside it.
-    var isSideProfile: Bool {
+    public var isSideProfile: Bool {
         switch self {
         case .car, .train, .boat, .bicycle: true
         case .plane, .bus, .rv, .walking: false
@@ -54,7 +54,7 @@ enum TravelMode: String, Codable, CaseIterable, Sendable, Identifiable {
 
     /// SF Symbol for the "Day Of" / departure step. Plane has a dedicated
     /// directional variant; everything else reuses the generic symbol.
-    var departureSymbol: String {
+    public var departureSymbol: String {
         switch self {
         case .plane: "airplane.departure"
         default: symbol
@@ -62,7 +62,7 @@ enum TravelMode: String, Codable, CaseIterable, Sendable, Identifiable {
     }
 
     /// SF Symbol for the "On Return" / arrival step.
-    var arrivalSymbol: String {
+    public var arrivalSymbol: String {
         switch self {
         case .plane: "airplane.arrival"
         default: symbol

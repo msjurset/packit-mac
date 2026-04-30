@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 struct DestinationField: View {
     @Binding var destination: TripDestination?

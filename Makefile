@@ -1,9 +1,19 @@
 APP_NAME := PackIt
 BUNDLE := $(APP_NAME).app
 INSTALL_DIR := /Applications
+CLI_INSTALL_DIR := $(HOME)/.local/bin
 
 build:
 	swift build -c release
+
+build-cli:
+	swift build -c release --product packit-backup
+
+install-cli: build-cli
+	@mkdir -p $(CLI_INSTALL_DIR)
+	command cp .build/release/packit-backup $(CLI_INSTALL_DIR)/packit-backup
+	@echo "Installed packit-backup to $(CLI_INSTALL_DIR)/packit-backup"
+	@echo "Make sure $(CLI_INSTALL_DIR) is on your PATH."
 
 bundle: build icon
 	@mkdir -p $(BUNDLE)/Contents/MacOS $(BUNDLE)/Contents/Resources $(BUNDLE)/Contents/Frameworks
@@ -65,4 +75,4 @@ release:
 	@test -n "$(VERSION)" || (echo "Usage: make release VERSION=1.0.0" && exit 1)
 	./scripts/release.sh $(VERSION)
 
-.PHONY: build bundle icon deploy clean test uitest seed dmg release
+.PHONY: build build-cli install-cli bundle icon deploy clean test uitest seed dmg release

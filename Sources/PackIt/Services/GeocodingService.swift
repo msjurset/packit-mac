@@ -1,4 +1,5 @@
 import Foundation
+import PackItKit
 
 actor GeocodingService {
     static let shared = GeocodingService()

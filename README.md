@@ -130,6 +130,14 @@ A macOS app for managing reusable packing list templates, trip-specific checklis
 - Most packed items, top categories, frequently added ad-hoc items
 - Trip timeline with history
 
+### Backup & Restore
+- One-click backup of all templates, trips, tags, categories, and config to a single ZIP
+- Restore creates an automatic pre-restore safety snapshot for one-step undo
+- Schema-versioned manifest rejects archives from incompatible future versions
+- Atomic writes: failed restores roll back to your previous state
+- Standalone `packit-backup` CLI for headless invocation by schedulers like goback
+- Built-in retention with manual prune
+
 ### Other
 - Appearance toggle (System/Dark/Light)
 - Open on launch (Templates/Last Used)
@@ -162,6 +170,9 @@ make uitest
 # Deploy to /Applications
 make deploy
 
+# Install the packit-backup CLI to ~/.local/bin
+make install-cli
+
 # Create DMG
 make dmg
 
@@ -176,9 +187,13 @@ swift scripts/seed-rv-templates.swift
 
 - **SwiftUI** with `@Observable` + `@MainActor` state management
 - **File-based JSON persistence** in `~/.packit/` (local) and configurable shared folder
+- **`PackItKit`** library target — Foundation-only models and the `Persistence` actor; shared by the GUI and the `packit-backup` CLI
+- **`PackIt`** executable target — SwiftUI views, stores, GUI services
+- **`packit-backup`** executable target — headless CLI for backup/restore/list/prune, used by schedulers like goback
 - **`PackItStore`** — central state manager with undo/redo, sharing, conflict detection
-- **`Persistence`** actor — dual-directory async file I/O (local + shared)
+- **`Persistence`** actor — dual-directory async file I/O (local + shared) plus backup/restore
 - **Two-column layout** — Sidebar via `NavigationSplitView`, detail with `HStack` sub-panels
+- Backups land at `~/.packit/backups/packit-<ISO-timestamp>.zip` with a `manifest.json` recording schema version and creation date
 
 ### Data Flow
 

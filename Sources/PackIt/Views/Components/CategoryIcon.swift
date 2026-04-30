@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 enum CategoryIcon {
     static func icon(for category: String) -> String {

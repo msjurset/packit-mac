@@ -1,6 +1,6 @@
 import Foundation
 
-enum PrepTaskTiming: String, Codable, CaseIterable, Comparable, Sendable {
+public enum PrepTaskTiming: String, Codable, CaseIterable, Comparable, Sendable {
     case early
     case weeksBefore
     case weekBefore
@@ -8,7 +8,7 @@ enum PrepTaskTiming: String, Codable, CaseIterable, Comparable, Sendable {
     case dayOf
     case onReturn
 
-    var label: String {
+    public var label: String {
         switch self {
         case .early: "Early"
         case .weeksBefore: "2 Weeks Before"
@@ -19,7 +19,7 @@ enum PrepTaskTiming: String, Codable, CaseIterable, Comparable, Sendable {
         }
     }
 
-    var shortLabel: String {
+    public var shortLabel: String {
         switch self {
         case .early: "early"
         case .weeksBefore: "2wk before"
@@ -30,11 +30,11 @@ enum PrepTaskTiming: String, Codable, CaseIterable, Comparable, Sendable {
         }
     }
 
-    var icon: String { icon(for: .plane) }
+    public var icon: String { icon(for: .plane) }
 
     /// Travel-mode-aware icon. Only `.dayOf` and `.onReturn` actually vary;
     /// the rest are calendar-based and identical across modes.
-    func icon(for travelMode: TravelMode) -> String {
+    public func icon(for travelMode: TravelMode) -> String {
         switch self {
         case .early: "calendar.badge.exclamationmark"
         case .weeksBefore: "calendar.badge.clock"
@@ -56,11 +56,11 @@ enum PrepTaskTiming: String, Codable, CaseIterable, Comparable, Sendable {
         }
     }
 
-    static func < (lhs: PrepTaskTiming, rhs: PrepTaskTiming) -> Bool {
+    public static func < (lhs: PrepTaskTiming, rhs: PrepTaskTiming) -> Bool {
         lhs.sortIndex < rhs.sortIndex
     }
 
-    func dueDate(departure: Date, returnDate: Date?) -> Date {
+    public func dueDate(departure: Date, returnDate: Date?) -> Date {
         switch self {
         case .early:
             Calendar.current.date(byAdding: .day, value: -21, to: departure)!
@@ -78,15 +78,15 @@ enum PrepTaskTiming: String, Codable, CaseIterable, Comparable, Sendable {
     }
 }
 
-struct PrepTaskTemplate: Codable, Identifiable, Hashable, Sendable {
-    var id: UUID
-    var name: String
-    var category: String?
-    var timing: PrepTaskTiming
-    var contextTags: [String]
-    var notes: String?
+public struct PrepTaskTemplate: Codable, Identifiable, Hashable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var category: String?
+    public var timing: PrepTaskTiming
+    public var contextTags: [String]
+    public var notes: String?
 
-    init(id: UUID = UUID(), name: String, category: String? = nil, timing: PrepTaskTiming = .daysBefore, contextTags: [String] = [], notes: String? = nil) {
+    public init(id: UUID = UUID(), name: String, category: String? = nil, timing: PrepTaskTiming = .daysBefore, contextTags: [String] = [], notes: String? = nil) {
         self.id = id
         self.name = name
         self.category = category
@@ -95,7 +95,7 @@ struct PrepTaskTemplate: Codable, Identifiable, Hashable, Sendable {
         self.notes = notes
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)

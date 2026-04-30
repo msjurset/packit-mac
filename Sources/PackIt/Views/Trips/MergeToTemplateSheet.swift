@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 struct MergeToTemplateSheet: View {
     @Environment(PackItStore.self) private var store

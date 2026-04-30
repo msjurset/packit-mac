@@ -1,4 +1,5 @@
 import Foundation
+import PackItKit
 import SwiftUI
 
 struct DailyForecast: Identifiable, Sendable {

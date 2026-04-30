@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 import AppKit
 
 /// Drag payload prefix for category-reorder drags. Item drops are bare UUIDs,

@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 @Observable
 @MainActor
@@ -1799,6 +1800,33 @@ final class PackItStore {
                 self.error = error.localizedDescription
             }
         }
+    }
+
+    // MARK: - Backup & Restore
+
+    func createBackup() async throws -> URL {
+        try await persistence.backup()
+    }
+
+    func listBackups() async throws -> [URL] {
+        try await persistence.listBackups()
+    }
+
+    func restoreBackup(from url: URL) async throws {
+        try await persistence.restore(from: url)
+        loadAll()
+    }
+
+    func pruneBackups(keep: Int) async throws {
+        try await persistence.pruneBackups(keep: keep)
+    }
+
+    func deleteBackup(at url: URL) async throws {
+        try await persistence.deleteBackup(at: url)
+    }
+
+    var backupsDirectory: URL {
+        get async { await persistence.backupsDir }
     }
 
     // MARK: - Config

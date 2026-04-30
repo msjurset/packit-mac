@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 struct TagManagerView: View {
     @Environment(PackItStore.self) private var store

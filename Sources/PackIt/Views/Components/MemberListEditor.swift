@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 /// Inline editor for a trip's member list. Add by typing + Return; remove by clicking ×.
 struct MemberListEditor: View {

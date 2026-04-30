@@ -1,14 +1,14 @@
 import Foundation
 
-enum ProcedurePhase: String, Codable, CaseIterable, Identifiable, Comparable, Sendable {
+public enum ProcedurePhase: String, Codable, CaseIterable, Identifiable, Comparable, Sendable {
     case beforeDeparture
     case onArrival
     case beforeLeaving
     case onReturn
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var label: String {
+    public var label: String {
         switch self {
         case .beforeDeparture: "Before Departure"
         case .onArrival: "On Arrival / Setup"
@@ -17,7 +17,7 @@ enum ProcedurePhase: String, Codable, CaseIterable, Identifiable, Comparable, Se
         }
     }
 
-    var icon: String {
+    public var icon: String {
         switch self {
         case .beforeDeparture: "arrow.right.circle"
         case .onArrival: "mappin.circle"
@@ -35,20 +35,20 @@ enum ProcedurePhase: String, Codable, CaseIterable, Identifiable, Comparable, Se
         }
     }
 
-    static func < (lhs: ProcedurePhase, rhs: ProcedurePhase) -> Bool {
+    public static func < (lhs: ProcedurePhase, rhs: ProcedurePhase) -> Bool {
         lhs.sortIndex < rhs.sortIndex
     }
 }
 
 // MARK: - Template Models
 
-struct ProcedureStepTemplate: Codable, Identifiable, Hashable, Sendable {
-    var id: UUID
-    var text: String
-    var notes: String?
-    var sortOrder: Int
+public struct ProcedureStepTemplate: Codable, Identifiable, Hashable, Sendable {
+    public var id: UUID
+    public var text: String
+    public var notes: String?
+    public var sortOrder: Int
 
-    init(id: UUID = UUID(), text: String, notes: String? = nil, sortOrder: Int = 0) {
+    public init(id: UUID = UUID(), text: String, notes: String? = nil, sortOrder: Int = 0) {
         self.id = id
         self.text = text
         self.notes = notes
@@ -56,32 +56,32 @@ struct ProcedureStepTemplate: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
-struct ProcedureTemplate: Codable, Identifiable, Hashable, Sendable {
-    var id: UUID
-    var name: String
-    var phase: ProcedurePhase
-    var steps: [ProcedureStepTemplate]
+public struct ProcedureTemplate: Codable, Identifiable, Hashable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var phase: ProcedurePhase
+    public var steps: [ProcedureStepTemplate]
 
-    init(id: UUID = UUID(), name: String, phase: ProcedurePhase, steps: [ProcedureStepTemplate] = []) {
+    public init(id: UUID = UUID(), name: String, phase: ProcedurePhase, steps: [ProcedureStepTemplate] = []) {
         self.id = id
         self.name = name
         self.phase = phase
         self.steps = steps
     }
 
-    var stepCount: Int { steps.count }
+    public var stepCount: Int { steps.count }
 }
 
 // MARK: - Trip Instance Models
 
-struct ProcedureStep: Codable, Identifiable, Hashable, Sendable {
-    var id: UUID
-    var text: String
-    var notes: String?
-    var isComplete: Bool
-    var sortOrder: Int
+public struct ProcedureStep: Codable, Identifiable, Hashable, Sendable {
+    public var id: UUID
+    public var text: String
+    public var notes: String?
+    public var isComplete: Bool
+    public var sortOrder: Int
 
-    init(id: UUID = UUID(), text: String, notes: String? = nil, isComplete: Bool = false, sortOrder: Int = 0) {
+    public init(id: UUID = UUID(), text: String, notes: String? = nil, isComplete: Bool = false, sortOrder: Int = 0) {
         self.id = id
         self.text = text
         self.notes = notes
@@ -89,7 +89,7 @@ struct ProcedureStep: Codable, Identifiable, Hashable, Sendable {
         self.sortOrder = sortOrder
     }
 
-    init(from template: ProcedureStepTemplate) {
+    public init(from template: ProcedureStepTemplate) {
         self.id = UUID()
         self.text = template.text
         self.notes = template.notes
@@ -98,14 +98,14 @@ struct ProcedureStep: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
-struct Procedure: Codable, Identifiable, Hashable, Sendable {
-    var id: UUID
-    var name: String
-    var phase: ProcedurePhase
-    var steps: [ProcedureStep]
-    var isCollapsed: Bool
+public struct Procedure: Codable, Identifiable, Hashable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var phase: ProcedurePhase
+    public var steps: [ProcedureStep]
+    public var isCollapsed: Bool
 
-    init(id: UUID = UUID(), name: String, phase: ProcedurePhase, steps: [ProcedureStep] = [], isCollapsed: Bool = false) {
+    public init(id: UUID = UUID(), name: String, phase: ProcedurePhase, steps: [ProcedureStep] = [], isCollapsed: Bool = false) {
         self.id = id
         self.name = name
         self.phase = phase
@@ -113,7 +113,7 @@ struct Procedure: Codable, Identifiable, Hashable, Sendable {
         self.isCollapsed = isCollapsed
     }
 
-    init(from template: ProcedureTemplate) {
+    public init(from template: ProcedureTemplate) {
         self.id = UUID()
         self.name = template.name
         self.phase = template.phase
@@ -121,13 +121,13 @@ struct Procedure: Codable, Identifiable, Hashable, Sendable {
         self.isCollapsed = false
     }
 
-    var completedCount: Int { steps.filter(\.isComplete).count }
-    var progress: Double {
+    public var completedCount: Int { steps.filter(\.isComplete).count }
+    public var progress: Double {
         guard !steps.isEmpty else { return 0 }
         return Double(completedCount) / Double(steps.count)
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)

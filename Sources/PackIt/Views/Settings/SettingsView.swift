@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 struct SettingsView: View {
     @Environment(PackItStore.self) private var store
@@ -15,8 +16,10 @@ struct SettingsView: View {
                 .tabItem { Label("Weather", systemImage: "cloud.sun") }
             printSettingsTab
                 .tabItem { Label("Print", systemImage: "printer") }
+            BackupSettingsView()
+                .tabItem { Label("Backup", systemImage: "externaldrive.badge.timemachine") }
         }
-        .frame(width: 600, height: 580)
+        .frame(width: 640, height: 580)
         .onAppear { loadConfig() }
     }
 

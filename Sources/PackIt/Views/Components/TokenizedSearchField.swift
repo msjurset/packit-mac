@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 import AppKit
 
 /// NSTextField-backed search field with explicit key callbacks for autocomplete.

@@ -3,14 +3,14 @@ import Foundation
 /// First-class category metadata: name + icon + color. Stored at
 /// `~/.packit/categories.json`. Items still hold a plain `String?` for the
 /// category — these records just decorate it.
-struct ItemCategory: Codable, Identifiable, Hashable, Sendable {
-    var id: UUID
-    var name: String
-    var icon: String       // SF Symbol name
-    var color: String      // CategoryColor.rawValue
-    var rank: Int          // Manual ordering; ignored when sort mode is .name.
+public struct ItemCategory: Codable, Identifiable, Hashable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var icon: String       // SF Symbol name
+    public var color: String      // CategoryColor.rawValue
+    public var rank: Int          // Manual ordering; ignored when sort mode is .name.
 
-    init(id: UUID = UUID(), name: String, icon: String, color: String, rank: Int = 0) {
+    public init(id: UUID = UUID(), name: String, icon: String, color: String, rank: Int = 0) {
         self.id = id
         self.name = name
         self.icon = icon
@@ -18,11 +18,11 @@ struct ItemCategory: Codable, Identifiable, Hashable, Sendable {
         self.rank = rank
     }
 
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case id, name, icon, color, rank
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try c.decode(UUID.self, forKey: .id)
         self.name = try c.decode(String.self, forKey: .name)
@@ -32,14 +32,14 @@ struct ItemCategory: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
-enum CategorySortMode: String, Codable, CaseIterable, Sendable {
+public enum CategorySortMode: String, Codable, CaseIterable, Sendable {
     case name
     case manual
 }
 
 /// Curated palette of color tokens. Stored as raw strings so renaming
 /// SwiftUI's color names doesn't break files on disk.
-enum CategoryColor: String, CaseIterable, Codable, Sendable {
+public enum CategoryColor: String, CaseIterable, Codable, Sendable {
     case blue
     case teal
     case cyan

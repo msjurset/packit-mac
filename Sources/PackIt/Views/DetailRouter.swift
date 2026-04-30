@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 /// Middle column: shows list based on sidebar selection.
 struct ContentListView: View {

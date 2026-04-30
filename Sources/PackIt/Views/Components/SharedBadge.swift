@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 struct SharedBadge: View {
     let author: String?

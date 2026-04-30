@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 /// Edit an existing TripItem: name, category, owner, priority, qty, notes.
 struct EditTripItemSheet: View {

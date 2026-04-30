@@ -1,17 +1,17 @@
 import Foundation
 
-struct PrepTask: Codable, Identifiable, Hashable, Sendable {
-    var id: UUID
-    var name: String
-    var category: String?
-    var timing: PrepTaskTiming
-    var dueDate: Date
-    var isComplete: Bool
-    var notes: String?
-    var isAdHoc: Bool
-    var sourceTemplateTaskID: UUID?
+public struct PrepTask: Codable, Identifiable, Hashable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var category: String?
+    public var timing: PrepTaskTiming
+    public var dueDate: Date
+    public var isComplete: Bool
+    public var notes: String?
+    public var isAdHoc: Bool
+    public var sourceTemplateTaskID: UUID?
 
-    init(id: UUID = UUID(), name: String, category: String? = nil, timing: PrepTaskTiming = .daysBefore, dueDate: Date = .now, isComplete: Bool = false, notes: String? = nil, isAdHoc: Bool = false, sourceTemplateTaskID: UUID? = nil) {
+    public init(id: UUID = UUID(), name: String, category: String? = nil, timing: PrepTaskTiming = .daysBefore, dueDate: Date = .now, isComplete: Bool = false, notes: String? = nil, isAdHoc: Bool = false, sourceTemplateTaskID: UUID? = nil) {
         self.id = id
         self.name = name
         self.category = category
@@ -23,7 +23,7 @@ struct PrepTask: Codable, Identifiable, Hashable, Sendable {
         self.sourceTemplateTaskID = sourceTemplateTaskID
     }
 
-    init(from template: PrepTaskTemplate, departureDate: Date, returnDate: Date?) {
+    public init(from template: PrepTaskTemplate, departureDate: Date, returnDate: Date?) {
         self.id = UUID()
         self.name = template.name
         self.category = template.category
@@ -35,7 +35,7 @@ struct PrepTask: Codable, Identifiable, Hashable, Sendable {
         self.sourceTemplateTaskID = template.id
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
@@ -48,7 +48,7 @@ struct PrepTask: Codable, Identifiable, Hashable, Sendable {
         sourceTemplateTaskID = try container.decodeIfPresent(UUID.self, forKey: .sourceTemplateTaskID)
     }
 
-    var isOverdue: Bool {
+    public var isOverdue: Bool {
         guard !isComplete else { return false }
         return dueDate < .now
     }

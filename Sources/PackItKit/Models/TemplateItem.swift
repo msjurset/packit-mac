@@ -1,16 +1,16 @@
 import Foundation
 
-struct TemplateItem: Codable, Identifiable, Hashable, Sendable {
-    var id: UUID
-    var name: String
-    var category: String?
-    var owner: String?
-    var contextTags: [String]
-    var priority: Priority
-    var notes: String?
-    var quantity: Int
+public struct TemplateItem: Codable, Identifiable, Hashable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var category: String?
+    public var owner: String?
+    public var contextTags: [String]
+    public var priority: Priority
+    public var notes: String?
+    public var quantity: Int
 
-    init(id: UUID = UUID(), name: String, category: String? = nil, owner: String? = nil, contextTags: [String] = [], priority: Priority = .medium, notes: String? = nil, quantity: Int = 1) {
+    public init(id: UUID = UUID(), name: String, category: String? = nil, owner: String? = nil, contextTags: [String] = [], priority: Priority = .medium, notes: String? = nil, quantity: Int = 1) {
         self.id = id
         self.name = name
         self.category = category
@@ -21,7 +21,7 @@ struct TemplateItem: Codable, Identifiable, Hashable, Sendable {
         self.quantity = max(1, quantity)
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)

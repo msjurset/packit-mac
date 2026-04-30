@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 import AppKit
 
 /// Renders SwiftUI content inside a borderless, non-activating NSPanel child

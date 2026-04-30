@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 import AppKit
 
 /// Inline icon grid for picking an SF Symbol from `CategoryIconLibrary`.

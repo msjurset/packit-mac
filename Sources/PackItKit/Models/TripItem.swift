@@ -1,19 +1,19 @@
 import Foundation
 
-struct TripItem: Codable, Identifiable, Hashable, Sendable {
-    var id: UUID
-    var name: String
-    var category: String?
-    var owner: String?
-    var priority: Priority
-    var isPacked: Bool
-    var notes: String?
-    var dueDate: Date?
-    var sourceTemplateItemID: UUID?
-    var isAdHoc: Bool
-    var quantity: Int
+public struct TripItem: Codable, Identifiable, Hashable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var category: String?
+    public var owner: String?
+    public var priority: Priority
+    public var isPacked: Bool
+    public var notes: String?
+    public var dueDate: Date?
+    public var sourceTemplateItemID: UUID?
+    public var isAdHoc: Bool
+    public var quantity: Int
 
-    init(id: UUID = UUID(), name: String, category: String? = nil, owner: String? = nil, priority: Priority = .medium, isPacked: Bool = false, notes: String? = nil, dueDate: Date? = nil, sourceTemplateItemID: UUID? = nil, isAdHoc: Bool = false, quantity: Int = 1) {
+    public init(id: UUID = UUID(), name: String, category: String? = nil, owner: String? = nil, priority: Priority = .medium, isPacked: Bool = false, notes: String? = nil, dueDate: Date? = nil, sourceTemplateItemID: UUID? = nil, isAdHoc: Bool = false, quantity: Int = 1) {
         self.id = id
         self.name = name
         self.category = category
@@ -28,7 +28,7 @@ struct TripItem: Codable, Identifiable, Hashable, Sendable {
     }
 
     /// Create a trip item from a template item.
-    init(from templateItem: TemplateItem) {
+    public init(from templateItem: TemplateItem) {
         self.id = UUID()
         self.name = templateItem.name
         self.category = templateItem.category
@@ -42,7 +42,7 @@ struct TripItem: Codable, Identifiable, Hashable, Sendable {
         self.quantity = templateItem.quantity
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
@@ -57,7 +57,7 @@ struct TripItem: Codable, Identifiable, Hashable, Sendable {
         quantity = try container.decodeIfPresent(Int.self, forKey: .quantity) ?? 1
     }
 
-    var isOverdue: Bool {
+    public var isOverdue: Bool {
         guard let due = dueDate, !isPacked else { return false }
         return due < .now
     }

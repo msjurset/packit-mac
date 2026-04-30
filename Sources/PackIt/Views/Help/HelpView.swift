@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 struct HelpView: View {
     @State private var selectedTopic: HelpTopic? = .gettingStarted
@@ -146,6 +147,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
     case weather
     case sharing
     case compositeTemplates
+    case backup
 
     var id: String { rawValue }
 
@@ -171,6 +173,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .weather: return "Weather"
         case .sharing: return "Sharing"
         case .compositeTemplates: return "Composite Templates"
+        case .backup: return "Backup & Restore"
         }
     }
 
@@ -196,6 +199,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .weather: return "Trip weather forecast widget"
         case .sharing: return "Selective sharing via shared folders"
         case .compositeTemplates: return "Templates that link other templates"
+        case .backup: return "Snapshot and restore your PackIt data"
         }
     }
 
@@ -221,6 +225,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .weather: return "cloud.sun.fill"
         case .sharing: return "folder.badge.person.crop"
         case .compositeTemplates: return "square.stack.3d.up.fill"
+        case .backup: return "externaldrive.badge.timemachine"
         }
     }
 
@@ -246,6 +251,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .weather: return ["weather", "forecast", "temperature", "rain", "sun", "wind", "climate", "conditions"]
         case .sharing: return ["share", "shared folder", "collaborate", "family", "group", "selective", "permission", "sync"]
         case .compositeTemplates: return ["composite", "link", "combine", "nested", "parent", "child", "reference", "reuse", "modular"]
+        case .backup: return ["backup", "restore", "snapshot", "archive", "zip", "goback", "data loss", "recovery", "safety", "rollback", "manifest", "schema"]
         }
     }
 
@@ -831,6 +837,52 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                 **Organization** — Group related templates under a meaningful name that appears in your template list
 
                 Composites and regular templates can coexist. You can even include a composite alongside individual templates when creating a trip.
+                """),
+            ]
+
+        case .backup:
+            return [
+                HelpSection(title: "What Gets Backed Up", body: """
+                A backup captures every PackIt template, trip, tag, category, and your print/watermark configuration into a single ZIP archive. It does **not** include local-only preferences like your name or shared-folder path — those stay tied to this Mac.
+
+                Each archive contains a small **manifest** recording the schema version and creation date, so PackIt can recognize and validate it on restore.
+                """),
+                HelpSection(title: "Creating a Backup", body: """
+                Open **Settings → Backup** and click **Create Backup**. The archive lands at `~/.packit/backups/packit-<timestamp>.zip` and shows up in the list.
+
+                You can also run `packit-backup` from the terminal — useful for one-off snapshots before risky edits.
+                """, tips: [
+                    "Multiple backups created in the same second get a numeric suffix automatically; nothing gets overwritten",
+                ]),
+                HelpSection(title: "Restoring", body: """
+                Click **Restore** next to any backup, or use **Restore from File…** to pick a `.zip` from anywhere on disk.
+
+                Before swapping data in, PackIt automatically saves a **pre-restore safety snapshot** of your current state into the backups folder (look for the orange clock icon). If a restore wasn't what you wanted, just restore the safety snapshot to undo it.
+
+                Restores are atomic: if anything fails partway through, your original data is moved back into place before the error is reported.
+                """, tips: [
+                    "Restore replaces all current PackIt data. The safety snapshot is your single-step undo",
+                ]),
+                HelpSection(title: "Scheduled Backups with Goback", body: """
+                PackIt ships a CLI executable (`packit-backup`) so backup schedulers like [goback](https://github.com/) can run automatic snapshots. Install it with:
+
+                ```
+                make install-cli
+                ```
+
+                Then add a job to `~/.config/goback/config.yaml` that runs `~/.local/bin/packit-backup` on whatever schedule you like. Goback copies the resulting ZIP to your archive vault and sweeps the staging directory.
+
+                The in-app retention setting only matters when goback is paused or you make many manual backups in a single day — goback already handles long-term archival.
+                """),
+                HelpSection(title: "Backup Format", body: """
+                Backups are standard ZIP archives — you can inspect or extract them with any unzip tool. Each archive contains:
+
+                - `manifest.json` — schema version, app version, creation timestamp
+                - `templates/` — one JSON per template
+                - `trips/` — one JSON per trip
+                - `tags.json`, `categories.json`, `config.json`
+
+                Restoring an archive from a newer schema version is rejected with a clear error rather than silently importing partial data.
                 """),
             ]
         }

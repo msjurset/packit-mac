@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 /// Compact popover for editing a category's icon and color from the trip's
 /// item list. Auto-creates the category record if one doesn't exist yet.

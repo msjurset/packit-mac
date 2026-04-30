@@ -1,21 +1,21 @@
 import Foundation
 
-struct PackingTemplate: Codable, Identifiable, Hashable, Sendable {
-    var id: UUID
-    var name: String
-    var items: [TemplateItem]
-    var prepTasks: [PrepTaskTemplate]
-    var procedures: [ProcedureTemplate]
-    var referenceLinks: [ReferenceLink]
-    var linkedTemplateIDs: [UUID]
-    var contextTags: [String]
-    var version: Int
-    var lastModifiedBy: String?
-    var createdBy: String?
-    var createdAt: Date
-    var updatedAt: Date
+public struct PackingTemplate: Codable, Identifiable, Hashable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var items: [TemplateItem]
+    public var prepTasks: [PrepTaskTemplate]
+    public var procedures: [ProcedureTemplate]
+    public var referenceLinks: [ReferenceLink]
+    public var linkedTemplateIDs: [UUID]
+    public var contextTags: [String]
+    public var version: Int
+    public var lastModifiedBy: String?
+    public var createdBy: String?
+    public var createdAt: Date
+    public var updatedAt: Date
 
-    init(id: UUID = UUID(), name: String, items: [TemplateItem] = [], prepTasks: [PrepTaskTemplate] = [], procedures: [ProcedureTemplate] = [], referenceLinks: [ReferenceLink] = [], linkedTemplateIDs: [UUID] = [], contextTags: [String] = [], version: Int = 1, lastModifiedBy: String? = nil, createdBy: String? = nil, createdAt: Date = .now, updatedAt: Date = .now) {
+    public init(id: UUID = UUID(), name: String, items: [TemplateItem] = [], prepTasks: [PrepTaskTemplate] = [], procedures: [ProcedureTemplate] = [], referenceLinks: [ReferenceLink] = [], linkedTemplateIDs: [UUID] = [], contextTags: [String] = [], version: Int = 1, lastModifiedBy: String? = nil, createdBy: String? = nil, createdAt: Date = .now, updatedAt: Date = .now) {
         self.id = id
         self.name = name
         self.items = items
@@ -31,7 +31,7 @@ struct PackingTemplate: Codable, Identifiable, Hashable, Sendable {
         self.updatedAt = updatedAt
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
@@ -48,15 +48,15 @@ struct PackingTemplate: Codable, Identifiable, Hashable, Sendable {
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? .now
     }
 
-    var isComposite: Bool { !linkedTemplateIDs.isEmpty }
-    var itemCount: Int { items.count }
-    var prepTaskCount: Int { prepTasks.count }
+    public var isComposite: Bool { !linkedTemplateIDs.isEmpty }
+    public var itemCount: Int { items.count }
+    public var prepTaskCount: Int { prepTasks.count }
 
-    var categories: [String] {
+    public var categories: [String] {
         Array(Set(items.compactMap(\.category))).sorted()
     }
 
-    mutating func touch(by userName: String? = nil) {
+    public mutating func touch(by userName: String? = nil) {
         updatedAt = .now
         version += 1
         if let userName { lastModifiedBy = userName }

@@ -1,13 +1,13 @@
 import Foundation
 
-enum PrintLayout: String, Codable, CaseIterable, Identifiable {
+public enum PrintLayout: String, Codable, CaseIterable, Identifiable, Sendable {
     case standard
     case compact
     case dense
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .standard: return "Standard"
         case .compact: return "Compact"
@@ -15,7 +15,7 @@ enum PrintLayout: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var icon: String {
+    public var icon: String {
         switch self {
         case .standard: return "list.bullet.rectangle"
         case .compact: return "rectangle.grid.2x2"
@@ -24,22 +24,24 @@ enum PrintLayout: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-struct AppConfig: Codable {
-    var printLayout: PrintLayout = .standard
-    var patternStyle: PatternStyle = .palmTrees
-    var fullPageStyle: FullPageStyle = .none
-    var borderStyle: BorderStyle = .none
-    var patternOpacity: Double = 0.06
-    var fullPageOpacity: Double = 0.04
-    var borderOpacity: Double = 0.10
-    var enablePattern: Bool = true
-    var enableFullPage: Bool = false
-    var enableBorder: Bool = false
+public struct AppConfig: Codable, Sendable {
+    public var printLayout: PrintLayout = .standard
+    public var patternStyle: PatternStyle = .palmTrees
+    public var fullPageStyle: FullPageStyle = .none
+    public var borderStyle: BorderStyle = .none
+    public var patternOpacity: Double = 0.06
+    public var fullPageOpacity: Double = 0.04
+    public var borderOpacity: Double = 0.10
+    public var enablePattern: Bool = true
+    public var enableFullPage: Bool = false
+    public var enableBorder: Bool = false
+
+    public init() {}
 }
 
 // MARK: - Pattern (repeating tile)
 
-enum PatternStyle: String, Codable, CaseIterable, Identifiable {
+public enum PatternStyle: String, Codable, CaseIterable, Identifiable, Sendable {
     case none
     case palmTrees
     case mountains
@@ -50,9 +52,9 @@ enum PatternStyle: String, Codable, CaseIterable, Identifiable {
     case tropicalLeaves
     case anchors
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .none: return "None"
         case .palmTrees: return "Palm Trees"
@@ -66,7 +68,7 @@ enum PatternStyle: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var icon: String {
+    public var icon: String {
         switch self {
         case .none: return "circle.dashed"
         case .palmTrees: return "tree.fill"
@@ -83,7 +85,7 @@ enum PatternStyle: String, Codable, CaseIterable, Identifiable {
 
 // MARK: - Full-page art (single large illustration)
 
-enum FullPageStyle: String, Codable, CaseIterable, Identifiable {
+public enum FullPageStyle: String, Codable, CaseIterable, Identifiable, Sendable {
     case none
     case beachScene
     case mountainLandscape
@@ -92,9 +94,9 @@ enum FullPageStyle: String, Codable, CaseIterable, Identifiable {
     case tropicalFrame
     case nauticalChart
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .none: return "None"
         case .beachScene: return "Beach Scene"
@@ -106,7 +108,7 @@ enum FullPageStyle: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var icon: String {
+    public var icon: String {
         switch self {
         case .none: return "circle.dashed"
         case .beachScene: return "sun.horizon.fill"
@@ -121,7 +123,7 @@ enum FullPageStyle: String, Codable, CaseIterable, Identifiable {
 
 // MARK: - Border (decorative frame)
 
-enum BorderStyle: String, Codable, CaseIterable, Identifiable {
+public enum BorderStyle: String, Codable, CaseIterable, Identifiable, Sendable {
     case none
     case simpleLine
     case doubleLine
@@ -130,9 +132,9 @@ enum BorderStyle: String, Codable, CaseIterable, Identifiable {
     case passportStamps
     case ticketEdge
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .none: return "None"
         case .simpleLine: return "Simple Line"
@@ -144,7 +146,7 @@ enum BorderStyle: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    var icon: String {
+    public var icon: String {
         switch self {
         case .none: return "circle.dashed"
         case .simpleLine: return "rectangle"

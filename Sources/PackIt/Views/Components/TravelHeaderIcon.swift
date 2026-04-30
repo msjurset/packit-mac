@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 /// Travel-mode icon used in the trip header departure/return rows. Adds a
 /// subtle horizontal bob to imply motion and flips ground/water/cycle modes

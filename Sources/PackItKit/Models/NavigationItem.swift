@@ -1,6 +1,6 @@
 import Foundation
 
-enum NavigationItem: Hashable {
+public enum NavigationItem: Hashable {
     case templates
     case templateDetail(UUID)
     case tripsPlanning
@@ -12,7 +12,7 @@ enum NavigationItem: Hashable {
     case statistics
     case search
 
-    var sectionKey: String {
+    public var sectionKey: String {
         switch self {
         case .templates, .templateDetail: "templates"
         case .tripsPlanning: "tripsPlanning"
@@ -26,7 +26,7 @@ enum NavigationItem: Hashable {
         }
     }
 
-    static func from(sectionKey: String) -> NavigationItem? {
+    public static func from(sectionKey: String) -> NavigationItem? {
         switch sectionKey {
         case "templates": .templates
         case "tripsPlanning": .tripsPlanning

@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 /// Curated SF Symbols suitable for item categories, with searchable keywords.
 enum CategoryIconLibrary {

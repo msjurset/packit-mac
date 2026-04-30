@@ -1,21 +1,27 @@
 import Foundation
 
-enum WisdomType: String, Codable {
+public enum WisdomType: String, Codable, Sendable {
     case tip
     case quote
 }
 
-struct TravelWisdom: Identifiable {
-    let id = UUID()
-    let type: WisdomType
-    let text: String
-    let attribution: String?
+public struct TravelWisdom: Identifiable, Sendable {
+    public let id = UUID()
+    public let type: WisdomType
+    public let text: String
+    public let attribution: String?
 
-    static let all: [TravelWisdom] = tips + quotes
+    public init(type: WisdomType, text: String, attribution: String?) {
+        self.type = type
+        self.text = text
+        self.attribution = attribution
+    }
+
+    public static let all: [TravelWisdom] = tips + quotes
 
     // MARK: - Tips
 
-    static let tips: [TravelWisdom] = [
+    public static let tips: [TravelWisdom] = [
         // Packing strategy
         TravelWisdom(type: .tip, text: "Roll knits, fold wovens. Rolling stretchy fabrics saves space; structured fabrics like dress shirts wrinkle less when folded with tissue paper between layers.", attribution: nil),
         TravelWisdom(type: .tip, text: "Pack a pillowcase separately. It doubles as a laundry bag, a pillow cover for questionable hotel pillows, and an emergency tote.", attribution: nil),
@@ -69,7 +75,7 @@ struct TravelWisdom: Identifiable {
 
     // MARK: - Quotes
 
-    static let quotes: [TravelWisdom] = [
+    public static let quotes: [TravelWisdom] = [
         TravelWisdom(type: .quote, text: "The world is a book, and those who do not travel read only one page.", attribution: "Saint Augustine"),
         TravelWisdom(type: .quote, text: "Not all those who wander are lost.", attribution: "J.R.R. Tolkien"),
         TravelWisdom(type: .quote, text: "Travel is fatal to prejudice, bigotry, and narrow-mindedness.", attribution: "Mark Twain"),

@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 import AppKit
 
 struct PackingItemRow: View {

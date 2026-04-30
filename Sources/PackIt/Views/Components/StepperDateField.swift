@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 import AppKit
 
 /// Text+stepper date field that dismisses the auto-calendar overlay (macOS 15+)

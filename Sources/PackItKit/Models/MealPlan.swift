@@ -1,15 +1,15 @@
 import Foundation
 
-enum MealType: String, Codable, CaseIterable, Identifiable, Sendable {
+public enum MealType: String, Codable, CaseIterable, Identifiable, Sendable {
     case breakfast
     case lunch
     case dinner
     case snacks
     case beverages
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var label: String {
+    public var label: String {
         switch self {
         case .breakfast: "Breakfast"
         case .lunch: "Lunch"
@@ -19,7 +19,7 @@ enum MealType: String, Codable, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var icon: String {
+    public var icon: String {
         switch self {
         case .breakfast: "sunrise.fill"
         case .lunch: "sun.max.fill"
@@ -30,29 +30,29 @@ enum MealType: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-struct MealSlot: Codable, Identifiable, Hashable, Sendable {
-    var id: UUID
-    var items: [String]
+public struct MealSlot: Codable, Identifiable, Hashable, Sendable {
+    public var id: UUID
+    public var items: [String]
 
-    init(id: UUID = UUID(), items: [String] = []) {
+    public init(id: UUID = UUID(), items: [String] = []) {
         self.id = id
         self.items = items
     }
 
-    var isEmpty: Bool { items.isEmpty }
-    var display: String { items.joined(separator: ", ") }
+    public var isEmpty: Bool { items.isEmpty }
+    public var display: String { items.joined(separator: ", ") }
 }
 
-struct MealDay: Codable, Identifiable, Hashable, Sendable {
-    var id: UUID
-    var date: Date
-    var breakfast: MealSlot
-    var lunch: MealSlot
-    var dinner: MealSlot
-    var snacks: MealSlot
-    var beverages: MealSlot
+public struct MealDay: Codable, Identifiable, Hashable, Sendable {
+    public var id: UUID
+    public var date: Date
+    public var breakfast: MealSlot
+    public var lunch: MealSlot
+    public var dinner: MealSlot
+    public var snacks: MealSlot
+    public var beverages: MealSlot
 
-    init(id: UUID = UUID(), date: Date) {
+    public init(id: UUID = UUID(), date: Date) {
         self.id = id
         self.date = date
         self.breakfast = MealSlot()
@@ -62,15 +62,15 @@ struct MealDay: Codable, Identifiable, Hashable, Sendable {
         self.beverages = MealSlot()
     }
 
-    var dayLabel: String {
+    public var dayLabel: String {
         date.formatted(.dateTime.weekday(.abbreviated))
     }
 
-    var dateLabel: String {
+    public var dateLabel: String {
         date.formatted(.dateTime.month(.abbreviated).day())
     }
 
-    func slot(for type: MealType) -> MealSlot {
+    public func slot(for type: MealType) -> MealSlot {
         switch type {
         case .breakfast: breakfast
         case .lunch: lunch
@@ -80,7 +80,7 @@ struct MealDay: Codable, Identifiable, Hashable, Sendable {
         }
     }
 
-    mutating func setSlot(_ type: MealType, items: [String]) {
+    public mutating func setSlot(_ type: MealType, items: [String]) {
         switch type {
         case .breakfast: breakfast.items = items
         case .lunch: lunch.items = items
@@ -91,17 +91,17 @@ struct MealDay: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
-struct MealPlan: Codable, Hashable, Sendable {
-    var days: [MealDay]
-    var prepNotes: String
+public struct MealPlan: Codable, Hashable, Sendable {
+    public var days: [MealDay]
+    public var prepNotes: String
 
-    init(days: [MealDay] = [], prepNotes: String = "") {
+    public init(days: [MealDay] = [], prepNotes: String = "") {
         self.days = days
         self.prepNotes = prepNotes
     }
 
     /// Generate days from trip departure to return.
-    static func generate(departure: Date, returnDate: Date?) -> MealPlan {
+    public static func generate(departure: Date, returnDate: Date?) -> MealPlan {
         let end = returnDate ?? Calendar.current.date(byAdding: .day, value: 3, to: departure)!
         let dayCount = max(1, (Calendar.current.dateComponents([.day], from: departure, to: end).day ?? 0) + 1)
         let days = (0..<dayCount).map { offset in
@@ -112,7 +112,7 @@ struct MealPlan: Codable, Hashable, Sendable {
     }
 
     /// All unique food items across all days and meal types.
-    var allFoodItems: [String] {
+    public var allFoodItems: [String] {
         var items = Set<String>()
         for day in days {
             for type in MealType.allCases {

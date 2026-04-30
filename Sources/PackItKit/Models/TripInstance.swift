@@ -1,16 +1,16 @@
 import Foundation
 
-enum TripStatus: String, Codable, CaseIterable, Sendable {
+public enum TripStatus: String, Codable, CaseIterable, Sendable {
     case planning
     case active
     case completed
     case archived
 
-    var label: String {
+    public var label: String {
         rawValue.capitalized
     }
 
-    var icon: String {
+    public var icon: String {
         switch self {
         case .planning: return "pencil.and.list.clipboard"
         case .active: return "suitcase.fill"
@@ -20,33 +20,33 @@ enum TripStatus: String, Codable, CaseIterable, Sendable {
     }
 }
 
-struct TripInstance: Codable, Identifiable, Hashable, Sendable {
-    var id: UUID
-    var name: String
-    var icon: TripIcon
-    var destination: TripDestination?
-    var sourceTemplateIDs: [UUID]
-    var departureDate: Date
-    var returnDate: Date?
-    var items: [TripItem]
-    var prepTasks: [PrepTask]
-    var todos: [TripTodo]
-    var activities: [TripActivity]
-    var procedures: [Procedure]
-    var mealPlan: MealPlan?
-    var referenceLinks: [ReferenceLink]
-    var scratchNotes: String
-    var status: TripStatus
-    var version: Int
-    var lastModifiedBy: String?
-    var createdBy: String?
-    var rank: Int
-    var members: [String]
-    var travelMode: TravelMode
-    var createdAt: Date
-    var updatedAt: Date
+public struct TripInstance: Codable, Identifiable, Hashable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var icon: TripIcon
+    public var destination: TripDestination?
+    public var sourceTemplateIDs: [UUID]
+    public var departureDate: Date
+    public var returnDate: Date?
+    public var items: [TripItem]
+    public var prepTasks: [PrepTask]
+    public var todos: [TripTodo]
+    public var activities: [TripActivity]
+    public var procedures: [Procedure]
+    public var mealPlan: MealPlan?
+    public var referenceLinks: [ReferenceLink]
+    public var scratchNotes: String
+    public var status: TripStatus
+    public var version: Int
+    public var lastModifiedBy: String?
+    public var createdBy: String?
+    public var rank: Int
+    public var members: [String]
+    public var travelMode: TravelMode
+    public var createdAt: Date
+    public var updatedAt: Date
 
-    init(id: UUID = UUID(), name: String, icon: TripIcon = .suitcase, destination: TripDestination? = nil, sourceTemplateIDs: [UUID] = [], departureDate: Date = .now, returnDate: Date? = nil, items: [TripItem] = [], prepTasks: [PrepTask] = [], todos: [TripTodo] = [], activities: [TripActivity] = [], procedures: [Procedure] = [], mealPlan: MealPlan? = nil, referenceLinks: [ReferenceLink] = [], version: Int = 1, lastModifiedBy: String? = nil, createdBy: String? = nil, rank: Int = Int.max, members: [String] = [], travelMode: TravelMode = .plane, scratchNotes: String = "", status: TripStatus = .planning, createdAt: Date = .now, updatedAt: Date = .now) {
+    public init(id: UUID = UUID(), name: String, icon: TripIcon = .suitcase, destination: TripDestination? = nil, sourceTemplateIDs: [UUID] = [], departureDate: Date = .now, returnDate: Date? = nil, items: [TripItem] = [], prepTasks: [PrepTask] = [], todos: [TripTodo] = [], activities: [TripActivity] = [], procedures: [Procedure] = [], mealPlan: MealPlan? = nil, referenceLinks: [ReferenceLink] = [], version: Int = 1, lastModifiedBy: String? = nil, createdBy: String? = nil, rank: Int = Int.max, members: [String] = [], travelMode: TravelMode = .plane, scratchNotes: String = "", status: TripStatus = .planning, createdAt: Date = .now, updatedAt: Date = .now) {
         self.id = id
         self.name = name
         self.icon = icon
@@ -73,7 +73,7 @@ struct TripInstance: Codable, Identifiable, Hashable, Sendable {
         self.updatedAt = updatedAt
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
@@ -101,39 +101,39 @@ struct TripInstance: Codable, Identifiable, Hashable, Sendable {
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? .now
     }
 
-    var packedCount: Int { items.filter(\.isPacked).count }
-    var totalItems: Int { items.count }
-    var progress: Double {
+    public var packedCount: Int { items.filter(\.isPacked).count }
+    public var totalItems: Int { items.count }
+    public var progress: Double {
         guard totalItems > 0 else { return 0 }
         return Double(packedCount) / Double(totalItems)
     }
 
-    var adHocItems: [TripItem] {
+    public var adHocItems: [TripItem] {
         items.filter(\.isAdHoc)
     }
 
-    var overdueItems: [TripItem] {
+    public var overdueItems: [TripItem] {
         items.filter { $0.isOverdue && $0.priority >= .high }
     }
 
-    var incompleteTodos: [TripTodo] {
+    public var incompleteTodos: [TripTodo] {
         todos.filter { !$0.isComplete }
     }
 
-    var incompletePrepTasks: [PrepTask] {
+    public var incompletePrepTasks: [PrepTask] {
         prepTasks.filter { !$0.isComplete }
     }
 
-    var overduePrepTasks: [PrepTask] {
+    public var overduePrepTasks: [PrepTask] {
         prepTasks.filter(\.isOverdue)
     }
 
-    var isDepartureSoon: Bool {
+    public var isDepartureSoon: Bool {
         let daysUntil = Calendar.current.dateComponents([.day], from: .now, to: departureDate).day ?? 0
         return daysUntil >= 0 && daysUntil <= 3
     }
 
-    mutating func touch(by userName: String? = nil) {
+    public mutating func touch(by userName: String? = nil) {
         updatedAt = .now
         version += 1
         if let userName { lastModifiedBy = userName }

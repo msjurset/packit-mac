@@ -1,4 +1,5 @@
 import AppKit
+import PackItKit
 import CoreGraphics
 
 struct WatermarkRenderer {

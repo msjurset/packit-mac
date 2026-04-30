@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 import AppKit
 
 /// A text field that always left-aligns its text, bypassing macOS Form's forced right-alignment.

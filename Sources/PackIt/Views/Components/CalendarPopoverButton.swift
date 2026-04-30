@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 import AppKit
 
 /// A small "calendar" icon button that opens a graphical date picker in a popover.

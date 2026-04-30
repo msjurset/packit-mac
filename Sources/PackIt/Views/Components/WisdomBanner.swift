@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 struct WisdomBanner: View {
     @State private var currentWisdom: TravelWisdom = TravelWisdom.all.randomElement()!

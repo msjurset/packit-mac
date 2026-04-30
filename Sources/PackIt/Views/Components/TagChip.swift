@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 struct TagChip: View {
     let name: String

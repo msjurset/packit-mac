@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 import AppKit
 
 /// Popover button that lets the user pick an SF Symbol from `CategoryIconLibrary`.

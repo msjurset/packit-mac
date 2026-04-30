@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 struct StatisticsView: View {
     @Environment(PackItStore.self) private var store

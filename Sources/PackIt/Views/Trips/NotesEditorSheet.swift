@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 struct NotesEditorSheet: View {
     @Binding var text: String

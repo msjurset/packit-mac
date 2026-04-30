@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 struct ProcedureChecklistView: View {
     @Environment(PackItStore.self) private var store

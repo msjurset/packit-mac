@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 import Sparkle
 
 extension Notification.Name {

@@ -1,4 +1,5 @@
 import SwiftUI
+import PackItKit
 
 struct TripEditorSheet: View {
     @Environment(PackItStore.self) private var store
