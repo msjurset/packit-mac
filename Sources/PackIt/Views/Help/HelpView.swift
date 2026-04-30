@@ -864,11 +864,7 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                     "Restore replaces all current PackIt data. The safety snapshot is your single-step undo",
                 ]),
                 HelpSection(title: "Scheduled Backups with Goback", body: """
-                PackIt ships a CLI executable (`packit-backup`) so backup schedulers like [goback](https://github.com/) can run automatic snapshots. Install it with:
-
-                ```
-                make install-cli
-                ```
+                PackIt ships a headless `packit-backup` CLI for schedulers like goback. The easiest way to install it is the **Install…** button under *Command-Line Tool* on this same Backup tab — it creates a symlink at `~/.local/bin/packit-backup` pointing into the app bundle.
 
                 Then add a job to `~/.config/goback/config.yaml` that runs `~/.local/bin/packit-backup` on whatever schedule you like. Goback copies the resulting ZIP to your archive vault and sweeps the staging directory.
 

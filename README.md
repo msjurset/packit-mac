@@ -135,7 +135,7 @@ A macOS app for managing reusable packing list templates, trip-specific checklis
 - Restore creates an automatic pre-restore safety snapshot for one-step undo
 - Schema-versioned manifest rejects archives from incompatible future versions
 - Atomic writes: failed restores roll back to your previous state
-- Standalone `packit-backup` CLI for headless invocation by schedulers like goback
+- Headless `packit-backup` CLI bundled inside the .app for schedulers like goback; one-click "Install Command-Line Tool" symlinks it to `~/.local/bin/`
 - Built-in retention with manual prune
 
 ### Other

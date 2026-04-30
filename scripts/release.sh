@@ -16,12 +16,14 @@ echo "==> Building PackIt v${VERSION} (build ${BUILD_NUM})..."
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" Info.plist
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD_NUM}" Info.plist
 
-# Build release
+# Build release (GUI app + headless backup CLI)
 swift build -c release
+swift build -c release --product packit-backup
 
 # Bundle .app
 mkdir -p "${BUNDLE}/Contents/MacOS" "${BUNDLE}/Contents/Resources" "${BUNDLE}/Contents/Frameworks"
 cp .build/release/PackIt "${BUNDLE}/Contents/MacOS/${APP_NAME}"
+cp .build/release/packit-backup "${BUNDLE}/Contents/MacOS/packit-backup"
 install_name_tool -add_rpath @loader_path/../Frameworks "${BUNDLE}/Contents/MacOS/${APP_NAME}" 2>/dev/null || true
 cp Info.plist "${BUNDLE}/Contents/Info.plist"
 cp -R .build/arm64-apple-macosx/release/Sparkle.framework "${BUNDLE}/Contents/Frameworks/"

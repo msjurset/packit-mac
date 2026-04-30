@@ -16,80 +16,14 @@ struct BackupSettingsView: View {
     @State private var showDeleteConfirm = false
     @State private var showImporter = false
     @State private var keepCount: Int = 10
+    @State private var cliInstallStatus: String?
 
     var body: some View {
         Form {
-            Section {
-                HStack {
-                    Button {
-                        Task { await runBackup() }
-                    } label: {
-                        Label("Create Backup", systemImage: "square.and.arrow.down.on.square")
-                    }
-                    .disabled(isWorking)
-
-                    Button {
-                        showImporter = true
-                    } label: {
-                        Label("Restore from File…", systemImage: "tray.and.arrow.up")
-                    }
-                    .disabled(isWorking)
-
-                    Spacer()
-
-                    if let backupsDir {
-                        Button {
-                            NSWorkspace.shared.activateFileViewerSelecting([backupsDir])
-                        } label: {
-                            Label("Reveal in Finder", systemImage: "folder")
-                        }
-                        .buttonStyle(.borderless)
-                    }
-
-                    ContextualHelpButton(topic: .backup)
-                }
-
-                if isWorking {
-                    HStack(spacing: 6) {
-                        ProgressView().controlSize(.small)
-                        Text("Working…").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-            }
-
-            Section("Backups") {
-                if backups.isEmpty {
-                    Text("No backups yet. Click Create Backup to make one, or schedule daily backups via goback.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(backups, id: \.self) { url in
-                        backupRow(url)
-                    }
-                }
-            }
-
-            Section("Retention") {
-                HStack {
-                    Stepper(value: $keepCount, in: 1...50) {
-                        Text("Keep \(keepCount) most recent")
-                    }
-                    Spacer()
-                    Button("Prune Now") {
-                        Task { await runPrune() }
-                    }
-                    .disabled(isWorking || backups.count <= keepCount)
-                }
-                Text("Goback copies daily backups to your archive vault, then sweeps this staging area. This setting only matters if goback is paused or you make many manual backups.")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
+            actionsSection
+            backupsSection
+            retentionSection
+            cliSection
         }
         .formStyle(.grouped)
         .task { await refresh() }
@@ -125,6 +59,111 @@ struct BackupSettingsView: View {
             if case .success(let urls) = result, let url = urls.first {
                 pendingRestoreURL = url
                 showRestoreConfirm = true
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var actionsSection: some View {
+        Section {
+            HStack {
+                Button {
+                    Task { await runBackup() }
+                } label: {
+                    Label("Create Backup", systemImage: "square.and.arrow.down.on.square")
+                }
+                .disabled(isWorking)
+
+                Button {
+                    showImporter = true
+                } label: {
+                    Label("Restore from File…", systemImage: "tray.and.arrow.up")
+                }
+                .disabled(isWorking)
+
+                Spacer()
+
+                if let backupsDir {
+                    Button {
+                        NSWorkspace.shared.activateFileViewerSelecting([backupsDir])
+                    } label: {
+                        Label("Reveal in Finder", systemImage: "folder")
+                    }
+                    .buttonStyle(.borderless)
+                }
+
+                ContextualHelpButton(topic: .backup)
+            }
+
+            if isWorking {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Working…").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var backupsSection: some View {
+        Section("Backups") {
+            if backups.isEmpty {
+                Text("No backups yet. Click Create Backup to make one, or schedule daily backups via goback.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(backups, id: \.self) { url in
+                    backupRow(url)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var retentionSection: some View {
+        Section("Retention") {
+            HStack {
+                Stepper(value: $keepCount, in: 1...50) {
+                    Text("Keep \(keepCount) most recent")
+                }
+                Spacer()
+                Button("Prune Now") {
+                    Task { await runPrune() }
+                }
+                .disabled(isWorking || backups.count <= keepCount)
+            }
+            Text("Goback copies daily backups to your archive vault, then sweeps this staging area. This setting only matters if goback is paused or you make many manual backups.")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    @ViewBuilder
+    private var cliSection: some View {
+        Section("Command-Line Tool") {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("packit-backup")
+                        .font(.system(.body, design: .monospaced))
+                    Text("Headless CLI for backup schedulers like goback.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button(cliInstalled ? "Reinstall" : "Install…") {
+                    installCLI()
+                }
+            }
+            if let cliInstallStatus {
+                Text(cliInstallStatus)
+                    .font(.caption)
+                    .foregroundColor(cliInstallStatus.hasPrefix("Installed") ? .secondary : .red)
             }
         }
     }
@@ -226,6 +265,48 @@ struct BackupSettingsView: View {
             await refresh()
         } catch {
             errorMessage = "Prune failed: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - CLI Installation
+
+    private var bundledCLIURL: URL? {
+        Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent("packit-backup")
+    }
+
+    private var cliSymlinkURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".local/bin/packit-backup")
+    }
+
+    private var cliInstalled: Bool {
+        guard let bundled = bundledCLIURL else { return false }
+        let target = cliSymlinkURL
+        guard FileManager.default.fileExists(atPath: target.path) else { return false }
+        if let resolved = try? FileManager.default.destinationOfSymbolicLink(atPath: target.path) {
+            return resolved == bundled.path
+        }
+        return false
+    }
+
+    private func installCLI() {
+        cliInstallStatus = nil
+        guard let bundled = bundledCLIURL,
+              FileManager.default.fileExists(atPath: bundled.path) else {
+            cliInstallStatus = "CLI not bundled in this build. Use `make install-cli` from source."
+            return
+        }
+        let dest = cliSymlinkURL
+        let fm = FileManager.default
+        do {
+            try fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if fm.fileExists(atPath: dest.path) {
+                try fm.removeItem(at: dest)
+            }
+            try fm.createSymbolicLink(at: dest, withDestinationURL: bundled)
+            cliInstallStatus = "Installed at \(dest.path). Make sure ~/.local/bin is on your PATH."
+        } catch {
+            cliInstallStatus = "Install failed: \(error.localizedDescription)"
         }
     }
 }
