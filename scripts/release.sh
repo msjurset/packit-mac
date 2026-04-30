@@ -34,10 +34,13 @@ cp AppIcon.icns "${BUNDLE}/Contents/Resources/AppIcon.icns"
 
 # Codesign
 echo "==> Codesigning..."
-codesign --deep --force --options runtime \
+codesign --deep --force --options runtime --timestamp \
     --sign "${SIGN_IDENTITY}" \
     "${BUNDLE}/Contents/Frameworks/Sparkle.framework"
-codesign --force --options runtime \
+codesign --force --options runtime --timestamp \
+    --sign "${SIGN_IDENTITY}" \
+    "${BUNDLE}/Contents/MacOS/packit-backup"
+codesign --force --options runtime --timestamp \
     --sign "${SIGN_IDENTITY}" \
     --entitlements /dev/stdin <<ENTITLEMENTS "${BUNDLE}"
 <?xml version="1.0" encoding="UTF-8"?>
