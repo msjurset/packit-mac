@@ -235,9 +235,9 @@ enum HelpTopic: String, CaseIterable, Identifiable {
         case .templates: return ["template", "list", "create", "reusable", "blueprint", "duplicate", "copy", "clone"]
         case .templateItems: return ["item", "category", "priority", "quantity", "add", "edit", "delete", "drag", "drop", "reorder", "move", "sort", "suggest", "auto-fill", "double-click"]
         case .contextTags: return ["tag", "filter", "context", "beach", "winter", "fishing", "comma", "suggest", "auto-suggest", "tab", "cycling"]
-        case .creatingTrips: return ["trip", "vacation", "travel", "departure", "create", "new"]
+        case .creatingTrips: return ["trip", "vacation", "travel", "departure", "create", "new", "pin", "pinned", "star", "sidebar", "favorite"]
         case .packingChecklist: return ["pack", "check", "checkbox", "progress", "color", "category", "drag", "reorder", "batch", "all", "check all", "uncheck all"]
-        case .todosAndNotes: return ["todo", "task", "note", "inspector", "sidebar"]
+        case .todosAndNotes: return ["todo", "task", "note", "inspector", "sidebar", "markdown", "preview", "list", "ordered", "quote", "code", "heading", "smart enter", "checkbox"]
         case .merging: return ["merge", "promote", "ad-hoc", "new items", "template"]
         case .printing: return ["print", "watermark", "border", "paper", "pdf"]
         case .exporting: return ["export", "share", "html", "csv", "packitlist", "packittemplate", "airdrop", "template"]
@@ -419,6 +419,13 @@ enum HelpTopic: String, CaseIterable, Identifiable {
 
                 Change status from the **actions menu** (ellipsis icon) in the trip detail view.
                 """),
+                HelpSection(title: "Pinning Trips", body: """
+                Click the **star** next to the trip name in the detail header to pin a trip to the top of the sidebar. Pinned trips appear in a new **Pinned** section above Trips and Templates — one click jumps you straight there, regardless of which status section they belong to.
+
+                Right-click a trip in any list (or in the Pinned section) for a **Pin / Unpin** action. The star fills yellow when the trip is pinned.
+                """, tips: [
+                    "Pin the trip you're actively packing for so it stays one click away as your week fills up",
+                ]),
             ]
 
         case .packingChecklist:
@@ -453,6 +460,8 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                 ]),
                 HelpSection(title: "Adding Items During a Trip", body: """
                 Click **Add Item** at the top of the packing list. Items added during a trip are marked as **ad-hoc** (purple "new" badge). After the trip, you can merge these back into a template.
+
+                **Hold ⌥ Option** while hovering a category to reveal a **+ Add item** button next to its name — clicking opens the same sheet with that category pre-filled.
                 """),
                 HelpSection(title: "Multi-select & Bulk Actions", body: """
                 **Cmd-click** an item to add it to a selection; **Shift-click** to extend the range. A floating action bar appears at the bottom of the list with **Owner**, **Duplicate For**, and **Remove** menus that apply to the entire selection.
@@ -505,7 +514,12 @@ enum HelpTopic: String, CaseIterable, Identifiable {
                 """),
                 HelpSection(title: "Trip Notes", body: """
                 Click **Edit** to open the notes editor. Notes are free-form text for anything related to the trip: confirmation numbers, restaurant recommendations, packing reminders, or directions.
-                """),
+
+                The editor supports markdown — headings (`#`–`######`), ordered (`1.`) and unordered (`-`) lists, task lists (`- [ ]` / `- [x]`), block quotes (`> `), fenced code blocks (` ``` `), horizontal rules (`---`), plus inline bold/italic/strikethrough/code/links. Toggle the **Edit / Preview** segmented control to see a side-by-side rendered view.
+                """, tips: [
+                    "**Smart Enter** continues lists and quotes automatically — ordered list numbers auto-increment, and Enter on an empty list item exits the list",
+                    "The inspector's collapsed Notes preview uses the same renderer in compact form — wrapped text hang-indents under the first letter of each list item",
+                ]),
             ]
 
         case .merging:

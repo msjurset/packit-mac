@@ -26,6 +26,7 @@ A macOS app for managing reusable packing list templates, trip-specific checklis
 - Trip icons (48 themed options: beach, mountain, city, camping, surfing, sailing, biking, RV, …) with searchable picker and keyboard navigation (arrows / hjkl / Enter)
 - Destination with geocoding search
 - Trip statuses: Planning, Active, Completed, Archived
+- Pin trips to a top-of-sidebar **Pinned** section for fast access (star toggle in the trip header, context menu in trip list / pinned row)
 - Fullscreen detail mode
 - Drag-to-reorder trips within each section
 - Auto-select last viewed trip per section when navigating
@@ -50,6 +51,7 @@ A macOS app for managing reusable packing list templates, trip-specific checklis
 - Tokenized search filters: `category:`, `owner:`, `name:`, `priority:`, `packed:`, `notes:` with Tab-cycle autocomplete
 - Drag items into another category to recategorize; double-click a category header to rename
 - Drag-drop indicators with row-parting animation
+- Hold **⌥ Option** while hovering a category to reveal a per-category **+ Add item** affordance — clicking opens the Add Item sheet with the category pre-filled
 
 ### Categories
 - First-class categories with custom icon (curated SF Symbol library) and color
@@ -91,7 +93,9 @@ A macOS app for managing reusable packing list templates, trip-specific checklis
 - TODOs with quick-add and priority
 - Activities for trip inspiration (inline add/edit)
 - Weather forecast widget
-- Notes with markdown support and pop-out editor
+- Notes with a markdown editor (pop-out and side-by-side preview) — supports headings, ordered/unordered lists, task lists (`- [ ]` / `- [x]`), block quotes, fenced code blocks, horizontal rules, plus inline bold/italic/strikethrough/code/links
+- Smart Enter in the notes editor continues lists and block quotes automatically (auto-increments ordered list numbers, carries indent for nested lists); Enter on an empty list item strips the prefix and exits the list
+- Inspector preview and editor preview share one renderer — wrapped text hang-indents under the first letter of each list item
 - Reference links (clickable, with add/remove)
 - Trip info summary
 - All sections collapsible

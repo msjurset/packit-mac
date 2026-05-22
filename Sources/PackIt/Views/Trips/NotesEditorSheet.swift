@@ -25,12 +25,10 @@ struct NotesEditorSheet: View {
             Divider()
 
             if showPreview {
-                // Split: editor left, preview right
                 HStack(spacing: 0) {
-                    TextEditor(text: $text)
-                        .font(.system(.body, design: .monospaced))
-                        .scrollContentBackground(.hidden)
-                        .padding(12)
+                    MarkdownTextView(text: $text)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
 
                     Divider()
 
@@ -40,18 +38,17 @@ struct NotesEditorSheet: View {
                                 .font(.callout)
                                 .foregroundStyle(.tertiary)
                                 .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         } else {
-                            renderMarkdown(text)
+                            MarkdownPreview(source: text)
                                 .padding(12)
                         }
                     }
                 }
             } else {
-                // Full editor
-                TextEditor(text: $text)
-                    .font(.system(.body, design: .monospaced))
-                    .scrollContentBackground(.hidden)
-                    .padding(12)
+                MarkdownTextView(text: $text)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
             }
 
             Divider()
@@ -74,7 +71,7 @@ struct NotesEditorSheet: View {
                 }
                 .buttonStyle(.plain)
                 .popover(isPresented: $showSyntaxHelp, arrowEdge: .top) {
-                    markdownSyntaxHelp
+                    MarkdownSyntaxHelp()
                 }
 
                 Spacer()
@@ -85,84 +82,67 @@ struct NotesEditorSheet: View {
         }
         .frame(width: 700, height: 500)
     }
+}
 
-    @ViewBuilder
-    private func renderMarkdown(_ source: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach(Array(source.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
-                if line.hasPrefix("# ") {
-                    Text(inlineMarkdown(String(line.dropFirst(2))))
-                        .font(.title2.bold())
-                } else if line.hasPrefix("## ") {
-                    Text(inlineMarkdown(String(line.dropFirst(3))))
-                        .font(.title3.bold())
-                } else if line.hasPrefix("### ") {
-                    Text(inlineMarkdown(String(line.dropFirst(4))))
-                        .font(.headline)
-                } else if line.hasPrefix("- ") || line.hasPrefix("* ") {
-                    HStack(alignment: .top, spacing: 6) {
-                        Text("•")
-                            .foregroundStyle(.secondary)
-                        Text(inlineMarkdown(String(line.dropFirst(2))))
-                    }
-                    .font(.callout)
-                } else if line.trimmingCharacters(in: .whitespaces).isEmpty {
-                    Spacer().frame(height: 4)
-                } else {
-                    Text(inlineMarkdown(line))
-                        .font(.callout)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .textSelection(.enabled)
-    }
+// MARK: - Cheat sheet
 
-    private func inlineMarkdown(_ text: String) -> AttributedString {
-        (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text)
-    }
-
-    private var markdownSyntaxHelp: some View {
+private struct MarkdownSyntaxHelp: View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Markdown Syntax")
                 .font(.headline)
 
             Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-                GridRow {
-                    Text(verbatim: "**bold**").font(.caption.monospaced()).foregroundStyle(.secondary)
-                    Text("**bold**").font(.caption)
-                }
-                GridRow {
-                    Text(verbatim: "*italic*").font(.caption.monospaced()).foregroundStyle(.secondary)
-                    Text("*italic*").font(.caption)
-                }
-                GridRow {
-                    Text(verbatim: "`code`").font(.caption.monospaced()).foregroundStyle(.secondary)
-                    Text("`code`").font(.caption)
-                }
-                GridRow {
-                    Text(verbatim: "[text](url)").font(.caption.monospaced()).foregroundStyle(.secondary)
-                    Text("clickable link").font(.caption).foregroundStyle(.blue)
-                }
-                GridRow {
-                    Text(verbatim: "# Heading").font(.caption.monospaced()).foregroundStyle(.secondary)
-                    Text("Heading").font(.caption.bold())
-                }
-                GridRow {
-                    Text(verbatim: "## Subheading").font(.caption.monospaced()).foregroundStyle(.secondary)
-                    Text("Subheading").font(.caption.weight(.semibold))
-                }
-                GridRow {
-                    Text(verbatim: "- item").font(.caption.monospaced()).foregroundStyle(.secondary)
-                    HStack(spacing: 4) { Text("•").font(.caption); Text("item").font(.caption) }
-                }
-                GridRow {
-                    Text(verbatim: "~~strike~~").font(.caption.monospaced()).foregroundStyle(.secondary)
-                    Text("~~strike~~").font(.caption)
-                }
+                row("# Heading 1", AnyView(Text("Heading 1").font(.caption.bold())))
+                row("## Heading 2", AnyView(Text("Heading 2").font(.caption.weight(.semibold))))
+                row("### Heading 3", AnyView(Text("Heading 3").font(.caption.weight(.medium))))
+                row("**bold**", AnyView(Text("**bold**").font(.caption)))
+                row("*italic*", AnyView(Text("*italic*").font(.caption)))
+                row("~~strike~~", AnyView(Text("~~strike~~").font(.caption)))
+                row("`code`", AnyView(Text("`code`").font(.caption)))
+                row("[text](url)", AnyView(Text("clickable link").font(.caption).foregroundStyle(.blue)))
+                row("- item", AnyView(HStack(spacing: 4) { Text("•").font(.caption); Text("item").font(.caption) }))
+                row("1. item", AnyView(HStack(spacing: 4) { Text("1.").font(.caption.monospacedDigit()); Text("item").font(.caption) }))
+                row("- [ ] task", AnyView(HStack(spacing: 4) {
+                    Image(systemName: "square").font(.caption2)
+                    Text("task").font(.caption)
+                }))
+                row("- [x] done", AnyView(HStack(spacing: 4) {
+                    Image(systemName: "checkmark.square.fill").font(.caption2).foregroundStyle(.packitTeal)
+                    Text("done").font(.caption).strikethrough()
+                }))
+                row("> quote", AnyView(
+                    HStack(spacing: 6) {
+                        Rectangle().fill(Color.secondary.opacity(0.4)).frame(width: 2, height: 12)
+                        Text("quote").font(.caption.italic()).foregroundStyle(.secondary)
+                    }
+                ))
+                row("```", AnyView(Text("fenced code block").font(.caption2).foregroundStyle(.secondary)))
+                row("---", AnyView(Rectangle().fill(Color.secondary.opacity(0.4)).frame(height: 1)))
+            }
+
+            Divider().padding(.top, 4)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Smart Enter")
+                    .font(.caption.bold())
+                Text("Continues lists and quotes automatically. Press Enter on an empty list item to exit the list.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(16)
-        .frame(width: 280)
+        .frame(width: 320)
+    }
+
+    @ViewBuilder
+    private func row(_ syntax: String, _ rendered: AnyView) -> some View {
+        GridRow {
+            Text(verbatim: syntax)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+            rendered
+        }
     }
 }

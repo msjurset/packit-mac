@@ -401,6 +401,20 @@ final class PackItStore {
         trips.filter { $0.status == .archived }.sorted(by: rankedAscending(secondary: { $0.updatedAt > $1.updatedAt }))
     }
 
+    var pinnedTrips: [TripInstance] {
+        trips.filter(\.isPinned).sorted { a, b in
+            if a.rank != b.rank { return a.rank < b.rank }
+            return a.departureDate < b.departureDate
+        }
+    }
+
+    func togglePin(tripID: UUID) {
+        guard let trip = trips.first(where: { $0.id == tripID }) else { return }
+        var updated = trip
+        updated.isPinned.toggle()
+        updateTrip(updated, actionName: updated.isPinned ? "Pin Trip" : "Unpin Trip")
+    }
+
     private func rankedAscending(secondary: @escaping (TripInstance, TripInstance) -> Bool) -> (TripInstance, TripInstance) -> Bool {
         { a, b in
             if a.rank != b.rank { return a.rank < b.rank }

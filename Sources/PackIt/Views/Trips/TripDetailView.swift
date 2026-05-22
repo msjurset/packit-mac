@@ -52,7 +52,7 @@ struct TripDetailView: View {
 
     enum TripSheet: Identifiable {
         case edit
-        case addItem
+        case addItem(category: String?)
         case merge
         case export
         case printSettings
@@ -61,7 +61,12 @@ struct TripDetailView: View {
         case reviewItems
         case importTemplate
 
-        var id: String { String(describing: self) }
+        var id: String {
+            switch self {
+            case .addItem(let category): return "addItem:\(category ?? "")"
+            default: return String(describing: self)
+            }
+        }
     }
 
     var body: some View {
@@ -254,8 +259,8 @@ struct TripDetailView: View {
             switch sheet {
             case .edit:
                 TripEditorSheet(trip: trip)
-            case .addItem:
-                AddTripItemSheet(tripID: trip.id)
+            case .addItem(let category):
+                AddTripItemSheet(tripID: trip.id, initialCategory: category)
             case .merge:
                 MergeToTemplateSheet(trip: trip)
             case .export:
@@ -318,6 +323,15 @@ struct TripDetailView: View {
                         HStack(spacing: 8) {
                             Text(trip.name)
                                 .font(.title3.bold())
+                            Button {
+                                store.togglePin(tripID: trip.id)
+                            } label: {
+                                Image(systemName: trip.isPinned ? "star.fill" : "star")
+                                    .font(.callout)
+                                    .foregroundStyle(trip.isPinned ? Color.yellow : Color.secondary.opacity(0.6))
+                            }
+                            .buttonStyle(.plain)
+                            .help(trip.isPinned ? "Unpin from sidebar" : "Pin to sidebar")
                             if store.isReceivedShare(tripID: trip.id) {
                                 SharedBadge(author: trip.createdBy)
                             } else if store._sharedTripIDs.contains(trip.id) {
@@ -476,7 +490,7 @@ struct TripDetailView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
 
-                Button { activeSheet = .addItem } label: {
+                Button { activeSheet = .addItem(category: nil) } label: {
                     Label("Add Item", systemImage: "plus.circle")
                         .font(.caption)
                 }
@@ -519,7 +533,10 @@ struct TripDetailView: View {
                     },
                     onBulkSetOwner: { applyBulkOwner($0) },
                     onBulkDuplicate: { applyBulkDuplicate($0) },
-                    onBulkRemove: { applyBulkRemove() }
+                    onBulkRemove: { applyBulkRemove() },
+                    onAddItem: { cat in
+                        activeSheet = .addItem(category: cat.isEmpty ? nil : cat)
+                    }
                 )
             }
         }
@@ -1317,12 +1334,15 @@ struct CategorySection: View {
     var onBulkSetOwner: (String?) -> Void = { _ in }
     var onBulkDuplicate: (String?) -> Void = { _ in }
     var onBulkRemove: () -> Void = {}
+    var onAddItem: (String) -> Void = { _ in }
 
     @State private var isRenaming = false
     @State private var renameText = ""
     @State private var isHeaderDropTargeted = false
     @State private var isRenameFocused: Bool = false
     @State private var showIconPicker = false
+    @State private var isHovered = false
+    @State private var isOptionHeld = false
 
     private var packedCount: Int { items.filter(\.isPacked).count }
     private var allPacked: Bool { !items.isEmpty && packedCount == items.count }
@@ -1349,6 +1369,11 @@ struct CategorySection: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .animation(.easeInOut(duration: 0.15), value: isDropTarget)
         .animation(.easeInOut(duration: 0.15), value: isDragging)
+        .animation(.easeInOut(duration: 0.12), value: isHovered && isOptionHeld)
+        .onHover { hovering in isHovered = hovering }
+        .onModifierKeysChanged(mask: .option) { _, new in
+            isOptionHeld = !new.isEmpty
+        }
     }
 
     /// Thin drop zone above each section that catches category-reorder drags.
@@ -1449,6 +1474,20 @@ struct CategorySection: View {
                             // LeadingTextField with autoFocus: true takes focus + selects all.
                         }
                         .help("Double-click to rename")
+                }
+                if isHovered && isOptionHeld {
+                    Button {
+                        onAddItem(categoryForStore ?? "")
+                    } label: {
+                        Label("Add item", systemImage: "plus.circle")
+                            .font(.system(size: 11, weight: .medium))
+                            .labelStyle(.titleAndIcon)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.packitTeal)
+                    .padding(.leading, 8)
+                    .transition(.opacity.combined(with: .move(edge: .leading)))
+                    .help("Add an item to \(category)")
                 }
                 Spacer()
                 Text("\(packedCount)/\(items.count)")
@@ -1822,38 +1861,6 @@ struct TripInspectorView: View {
         }
     }
 
-    @ViewBuilder
-    private func renderedMarkdown(_ source: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            ForEach(Array(source.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
-                if line.hasPrefix("# ") {
-                    Text(mdInline(String(line.dropFirst(2))))
-                        .font(.subheadline.bold())
-                } else if line.hasPrefix("## ") {
-                    Text(mdInline(String(line.dropFirst(3))))
-                        .font(.callout.bold())
-                } else if line.hasPrefix("### ") {
-                    Text(mdInline(String(line.dropFirst(4))))
-                        .font(.callout.weight(.semibold))
-                } else if line.hasPrefix("- ") || line.hasPrefix("* ") {
-                    HStack(alignment: .top, spacing: 4) {
-                        Text("•").foregroundStyle(.secondary).font(.caption)
-                        Text(mdInline(String(line.dropFirst(2)))).font(.caption)
-                    }
-                } else if line.trimmingCharacters(in: .whitespaces).isEmpty {
-                    Spacer().frame(height: 2)
-                } else {
-                    Text(mdInline(line)).font(.caption)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func mdInline(_ text: String) -> AttributedString {
-        (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text)
-    }
-
     private func inspectorHeader(_ title: String, icon: String, collapsed: Binding<Bool>, @ViewBuilder trailing: () -> some View = { EmptyView() }) -> some View {
         HStack(spacing: 4) {
             Button {
@@ -1899,7 +1906,7 @@ struct TripInspectorView: View {
                         .font(.callout)
                         .foregroundStyle(.tertiary)
                 } else {
-                    renderedMarkdown(editedNotes)
+                    MarkdownPreview(source: editedNotes, style: .compact)
                         .foregroundStyle(.secondary)
                 }
             }

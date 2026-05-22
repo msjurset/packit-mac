@@ -68,6 +68,12 @@ struct ContentView: View {
             if let newStatus {
                 autoSelectTrip(for: newStatus)
             }
+
+            // Direct trip jump (e.g. selecting a pinned trip from the sidebar):
+            // sync the in-section selection so the trip list + detail line up.
+            if case .tripDetail(let id) = newVal {
+                store.selectedTripID = id
+            }
         }
         .onChange(of: store.isLoading) { _, nowLoading in
             if !nowLoading, let status = tripStatus(for: store.navigation) {
@@ -265,17 +271,16 @@ struct ContentView: View {
 
     @ViewBuilder
     private var tripListForCurrentSection: some View {
-        switch store.navigation {
-        case .tripsPlanning, .tripDetail:
+        let status = tripStatus(for: store.navigation) ?? .planning
+        switch status {
+        case .planning:
             TripListView(trips: store.planningTrips, status: .planning, title: "Planning", showNewTripSheet: $showNewTripSheet, onCollapse: collapseTripList, onExpand: expandTripList)
-        case .tripsActive:
+        case .active:
             TripListView(trips: store.activeTrips, status: .active, title: "Active Trips", showNewTripSheet: $showNewTripSheet, onCollapse: collapseTripList, onExpand: expandTripList)
-        case .tripsCompleted:
+        case .completed:
             TripListView(trips: store.completedTrips, status: .completed, title: "Completed", showNewTripSheet: $showNewTripSheet, onCollapse: collapseTripList, onExpand: expandTripList)
-        case .tripsArchived:
+        case .archived:
             TripListView(trips: store.archivedTrips, status: .archived, title: "Archived", showNewTripSheet: $showNewTripSheet, onCollapse: collapseTripList, onExpand: expandTripList)
-        default:
-            EmptyView()
         }
     }
 
@@ -322,6 +327,8 @@ struct ContentView: View {
         case .tripsActive: return .active
         case .tripsCompleted: return .completed
         case .tripsArchived: return .archived
+        case .tripDetail(let id):
+            return store.trips.first(where: { $0.id == id })?.status
         default: return nil
         }
     }

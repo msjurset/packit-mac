@@ -8,9 +8,12 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $selection) {
-            Section("Templates") {
-                sidebarRow("All Templates", icon: "doc.on.doc", tag: .templates, count: store.templates.count)
-                    .accessibilityIdentifier("sidebar.templates")
+            if !store.pinnedTrips.isEmpty {
+                Section("Pinned") {
+                    ForEach(store.pinnedTrips) { trip in
+                        pinnedTripRow(trip)
+                    }
+                }
             }
 
             Section("Trips") {
@@ -22,6 +25,11 @@ struct SidebarView: View {
                     .accessibilityIdentifier("sidebar.completed")
                 sidebarRow("Archived", icon: "archivebox", tag: .tripsArchived, count: store.archivedTrips.count)
                     .accessibilityIdentifier("sidebar.archived")
+            }
+
+            Section("Templates") {
+                sidebarRow("All Templates", icon: "doc.on.doc", tag: .templates, count: store.templates.count)
+                    .accessibilityIdentifier("sidebar.templates")
             }
 
             Section("Manage") {
@@ -86,5 +94,23 @@ struct SidebarView: View {
             }
         }
         .tag(tag)
+    }
+
+    private func pinnedTripRow(_ trip: TripInstance) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: trip.icon.symbol)
+                .foregroundStyle(.packitTeal)
+                .frame(width: 18)
+            Text(trip.name)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer()
+        }
+        .tag(NavigationItem.tripDetail(trip.id))
+        .contextMenu {
+            Button("Unpin", systemImage: "pin.slash") {
+                store.togglePin(tripID: trip.id)
+            }
+        }
     }
 }

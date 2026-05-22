@@ -124,6 +124,12 @@ struct TripListView: View {
                                     }
                                 }
                                 .contextMenu {
+                                    Button {
+                                        store.togglePin(tripID: trip.id)
+                                    } label: {
+                                        Label(trip.isPinned ? "Unpin" : "Pin", systemImage: trip.isPinned ? "pin.slash" : "pin")
+                                    }
+                                    Divider()
                                     if trip.status == .planning {
                                         Button {
                                             var updated = trip

@@ -7,10 +7,15 @@ struct AddTripItemSheet: View {
     let tripID: UUID
 
     @State private var name = ""
-    @State private var category = ""
+    @State private var category: String
     @State private var priority: Priority = .medium
     @State private var quantity = 1
     @State private var owner: String = ""
+
+    init(tripID: UUID, initialCategory: String? = nil) {
+        self.tripID = tripID
+        _category = State(initialValue: initialCategory ?? "")
+    }
 
     private var trip: TripInstance? {
         store.trips.first { $0.id == tripID }
