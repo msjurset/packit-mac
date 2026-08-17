@@ -130,7 +130,15 @@ struct TripListView: View {
                                         Label(trip.isPinned ? "Unpin" : "Pin", systemImage: trip.isPinned ? "pin.slash" : "pin")
                                     }
                                     Divider()
-                                    if trip.status == .planning {
+                                    if trip.status == .archived {
+                                        Button {
+                                            var updated = trip
+                                            updated.status = .active
+                                            store.updateTrip(updated)
+                                        } label: {
+                                            Label("Reactivate", systemImage: "suitcase.fill")
+                                        }
+                                    } else if trip.status == .planning {
                                         Button {
                                             var updated = trip
                                             updated.status = .active
@@ -138,25 +146,29 @@ struct TripListView: View {
                                         } label: {
                                             Label("Start Packing", systemImage: "suitcase.fill")
                                         }
-                                    }
-                                    if trip.status == .active {
+                                    } else if trip.status == .active {
                                         Button {
                                             var updated = trip
                                             updated.status = .completed
                                             store.updateTrip(updated)
                                         } label: {
-                                            Label("Mark Completed", systemImage: "checkmark.circle")
+                                            Label("Mark Completed", systemImage: "checkmark.circle.fill")
                                         }
                                     }
-                                    if trip.status != .archived {
-                                        Button {
+                                    Picker("Trip Status", selection: Binding(
+                                        get: { trip.status },
+                                        set: { newStatus in
                                             var updated = trip
-                                            updated.status = .archived
+                                            updated.status = newStatus
                                             store.updateTrip(updated)
-                                        } label: {
-                                            Label("Archive", systemImage: "archivebox")
+                                        }
+                                    )) {
+                                        ForEach(TripStatus.allCases, id: \.self) { status in
+                                            Label(status.label, systemImage: status.icon)
+                                                .tag(status)
                                         }
                                     }
+                                    Divider()
                                     Button {
                                         store.duplicateTrip(id: trip.id)
                                     } label: {

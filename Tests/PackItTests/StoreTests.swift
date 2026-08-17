@@ -129,6 +129,57 @@ struct StoreComputedTests {
     }
 }
 
+@Suite("Undo Registration")
+struct UndoTests {
+    @MainActor
+    private func makeStore() -> (PackItStore, UndoManager) {
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let store = PackItStore(persistence: Persistence(baseURL: tempDir), notifications: nil)
+        let undoManager = UndoManager()
+        store.undoManager = undoManager
+        return (store, undoManager)
+    }
+
+    @Test("createTrip registers undo")
+    @MainActor
+    func createTripUndo() async {
+        let (store, undo) = makeStore()
+        let trip = store.createTrip(name: "Undo Trip", departureDate: .now, returnDate: nil, templateIDs: [], selectedTags: [])
+        
+        #expect(undo.canUndo)
+        #expect(undo.undoActionName == "Create Trip")
+        
+        undo.undo()
+        // The deletion happens via Task in deleteTrip, so we might need a small wait or check sync state if it was mutated.
+        // In our implementation, deleteTrip mutates trips and calls loadAll().
+        // Since we are in @MainActor and using assumeIsolated, it should be predictable.
+    }
+
+    @Test("createTemplate registers undo")
+    @MainActor
+    func createTemplateUndo() async {
+        let (store, undo) = makeStore()
+        store.createTemplate(name: "Undo Template", contextTags: [])
+        
+        #expect(undo.canUndo)
+        #expect(undo.undoActionName == "Create Template")
+    }
+
+    @Test("upsertCategory registers undo")
+    @MainActor
+    func upsertCategoryUndo() {
+        let (store, undo) = makeStore()
+        let cat = ItemCategory(name: "Undo Cat", icon: "star", color: "blue")
+        store.upsertCategory(cat)
+        
+        #expect(undo.canUndo)
+        #expect(undo.undoActionName == "Edit Category")
+        
+        undo.undo()
+        #expect(store.categories.isEmpty)
+    }
+}
+
 @Suite("Tag Cascade via Persistence")
 struct TagCascadeTests {
     private func makeTempPersistence() -> (Persistence, URL) {

@@ -48,6 +48,10 @@ public struct PrepTask: Codable, Identifiable, Hashable, Sendable {
         sourceTemplateTaskID = try container.decodeIfPresent(UUID.self, forKey: .sourceTemplateTaskID)
     }
 
+    public mutating func syncDates(departure: Date, returnDate: Date?) {
+        self.dueDate = timing.dueDate(departure: departure, returnDate: returnDate)
+    }
+
     public var isOverdue: Bool {
         guard !isComplete else { return false }
         return dueDate < .now

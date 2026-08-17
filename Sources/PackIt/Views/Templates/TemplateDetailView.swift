@@ -434,6 +434,10 @@ struct TemplateDetailView: View {
         .sheet(item: $editingProcedure) { proc in
             ProcedureEditorSheet(templateID: template.id, procedure: proc)
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            NSApp.keyWindow?.makeFirstResponder(nil)
+        }
     }
 
     private var templateDetailSummary: String {

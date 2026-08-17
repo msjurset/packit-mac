@@ -17,13 +17,26 @@ struct MarkdownPreview: View {
     var style: Style = .standard
 
     var body: some View {
-        VStack(alignment: .leading, spacing: style == .compact ? 3 : 6) {
-            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-                renderBlock(block)
+        if style == .standard {
+            VStack(alignment: .leading, spacing: 6) {
+                content
             }
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            VStack(alignment: .leading, spacing: 3) {
+                content
+            }
+            .textSelection(.disabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .textSelection(.enabled)
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+            renderBlock(block)
+        }
     }
 
     // MARK: Block model

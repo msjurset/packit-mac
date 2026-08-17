@@ -136,6 +136,13 @@ public struct TripInstance: Codable, Identifiable, Hashable, Sendable {
         return daysUntil >= 0 && daysUntil <= 3
     }
 
+    public mutating func syncSubModelDates() {
+        for i in prepTasks.indices {
+            prepTasks[i].syncDates(departure: departureDate, returnDate: returnDate)
+        }
+        mealPlan?.syncDates(departure: departureDate, returnDate: returnDate)
+    }
+
     public mutating func touch(by userName: String? = nil) {
         updatedAt = .now
         version += 1

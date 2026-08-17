@@ -599,6 +599,9 @@ final class PackItStore {
     func createTemplate(name: String, contextTags: [String]) {
         var template = PackingTemplate(name: name, contextTags: contextTags, createdBy: currentUserName)
         template.touch()
+        registerUndo("Create Template") { store in
+            store.deleteTemplate(id: template.id)
+        }
         Task {
             do {
                 try await persistence.saveTemplate(template)
@@ -647,6 +650,9 @@ final class PackItStore {
             createdBy: currentUserName
         )
         copy.touch()
+        registerUndo("Duplicate Template") { store in
+            store.deleteTemplate(id: copy.id)
+        }
         Task {
             do {
                 try await persistence.saveTemplate(copy)
@@ -812,12 +818,17 @@ final class PackItStore {
         )
 
         showEditItemsOnNextTrip = true
+        registerUndo("Create Trip") { store in
+            store.deleteTrip(id: trip.id)
+        }
 
         Task {
             do {
                 try await persistence.saveTrip(trip)
                 await notifications?.syncReminders(trip: trip)
                 loadAll()
+                selectedTripID = trip.id
+                navigation = .tripDetail(trip.id)
             } catch {
                 self.error = error.localizedDescription
             }
@@ -832,6 +843,7 @@ final class PackItStore {
             }
         }
         var updated = trip
+        updated.syncSubModelDates()
         updated.touch(by: localConfig.userName.isEmpty ? nil : localConfig.userName)
 
         // Mutate in-memory state synchronously so the UI updates immediately and
@@ -931,6 +943,10 @@ final class PackItStore {
             scratchNotes: source.scratchNotes,
             status: .planning
         )
+
+        registerUndo("Duplicate Trip") { store in
+            store.deleteTrip(id: copy.id)
+        }
 
         Task {
             do {
@@ -1309,18 +1325,30 @@ final class PackItStore {
         updateTrip(trip, actionName: "Create Meal Plan")
     }
 
-    func updateMealSlot(tripID: UUID, dayID: UUID, mealType: MealType, items: [String]) {
+    func updateMealSlot(tripID: UUID, dayID: UUID, mealType: MealType, items: [String], icons: [String]) {
         guard var trip = trips.first(where: { $0.id == tripID }),
               var plan = trip.mealPlan,
               let dayIdx = plan.days.firstIndex(where: { $0.id == dayID }) else { return }
-        plan.days[dayIdx].setSlot(mealType, items: items)
+
+        let previousItems = plan.days[dayIdx].slot(for: mealType).items
+        let previousIcons = plan.days[dayIdx].slot(for: mealType).icons
+        registerUndo("Update Meal") { store in
+            store.updateMealSlot(tripID: tripID, dayID: dayID, mealType: mealType, items: previousItems, icons: previousIcons)
+        }
+
+        plan.days[dayIdx].setSlot(mealType, items: items, icons: icons)
         trip.mealPlan = plan
         updateTrip(trip, actionName: "Update Meal")
     }
-
     func updateMealPrepNotes(tripID: UUID, notes: String) {
         guard var trip = trips.first(where: { $0.id == tripID }),
               var plan = trip.mealPlan else { return }
+        
+        let previousNotes = plan.prepNotes
+        registerUndo("Update Meal Prep Notes") { store in
+            store.updateMealPrepNotes(tripID: tripID, notes: previousNotes)
+        }
+        
         plan.prepNotes = notes
         trip.mealPlan = plan
         updateTrip(trip, actionName: "Update Meal Prep Notes")
@@ -1461,6 +1489,9 @@ final class PackItStore {
 
     /// Insert or update a category record by name (case-insensitive match).
     func upsertCategory(_ cat: ItemCategory) {
+        let previous = categories.first(where: { $0.id == cat.id })
+            ?? categories.first(where: { $0.name.caseInsensitiveCompare(cat.name) == .orderedSame })
+
         if let idx = categories.firstIndex(where: { $0.id == cat.id }) {
             categories[idx] = cat
         } else if let idx = categories.firstIndex(where: { $0.name.caseInsensitiveCompare(cat.name) == .orderedSame }) {
@@ -1468,11 +1499,23 @@ final class PackItStore {
         } else {
             categories.append(cat)
         }
+
+        registerUndo("Edit Category") { store in
+            if let prev = previous {
+                store.upsertCategory(prev)
+            } else {
+                store.deleteCategory(id: cat.id)
+            }
+        }
         persistCategories()
     }
 
     func deleteCategory(id: UUID) {
+        guard let cat = categories.first(where: { $0.id == id }) else { return }
         categories.removeAll { $0.id == id }
+        registerUndo("Delete Category") { store in
+            store.upsertCategory(cat)
+        }
         persistCategories()
     }
 

@@ -9,6 +9,7 @@ extension Notification.Name {
 @main
 struct PackItApp: App {
     @State private var store = PackItStore()
+    @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
     private let updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
 
@@ -16,7 +17,10 @@ struct PackItApp: App {
         WindowGroup {
             RootShell {
                 ContentView()
-                    .onAppear { store.startBackgroundRefresh() }
+                    .onAppear {
+                        store.undoManager = undoManager
+                        store.startBackgroundRefresh()
+                    }
                     .onDisappear { store.stopBackgroundRefresh() }
             }
             .environment(store)

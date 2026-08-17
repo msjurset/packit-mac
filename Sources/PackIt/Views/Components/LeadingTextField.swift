@@ -10,9 +10,10 @@ struct LeadingTextField: NSViewRepresentable {
     var prompt: String = ""
     var isFocused: Binding<Bool>?
     var autoFocus: Bool = false
+    var onSubmit: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text, isFocused: isFocused)
+        Coordinator(text: $text, isFocused: isFocused, onSubmit: onSubmit)
     }
 
     func makeNSView(context: Context) -> NSTextField {
@@ -40,6 +41,7 @@ struct LeadingTextField: NSViewRepresentable {
     }
 
     func updateNSView(_ tf: NSTextField, context: Context) {
+        context.coordinator.onSubmit = onSubmit
         if tf.stringValue != text {
             tf.stringValue = text
         }
@@ -49,10 +51,12 @@ struct LeadingTextField: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextFieldDelegate {
         var text: Binding<String>
         var isFocused: Binding<Bool>?
+        var onSubmit: (() -> Void)?
 
-        init(text: Binding<String>, isFocused: Binding<Bool>?) {
+        init(text: Binding<String>, isFocused: Binding<Bool>?, onSubmit: (() -> Void)?) {
             self.text = text
             self.isFocused = isFocused
+            self.onSubmit = onSubmit
         }
 
         func controlTextDidChange(_ obj: Notification) {
@@ -66,6 +70,19 @@ struct LeadingTextField: NSViewRepresentable {
 
         func controlTextDidEndEditing(_ obj: Notification) {
             isFocused?.wrappedValue = false
+        }
+
+        @MainActor
+        func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+                textView.window?.makeFirstResponder(nil)
+                onSubmit?()
+                return true
+            } else if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+                textView.window?.makeFirstResponder(nil)
+                return true
+            }
+            return false
         }
     }
 }

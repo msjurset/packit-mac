@@ -56,7 +56,6 @@ class PackingListPrintView: NSView {
         // Build flat list of render blocks to flow into columns
         let blocks = buildBlocks()
         let usableHeight = printableHeight - headerHeight
-        let colWidth = (printableWidth - columnGap * CGFloat(columnCount - 1)) / CGFloat(columnCount)
 
         // Flow blocks into columns across pages
         var pageCount = 1

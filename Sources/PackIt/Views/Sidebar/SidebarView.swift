@@ -6,6 +6,8 @@ struct SidebarView: View {
     @Environment(\.openWindow) private var openWindow
     @Binding var selection: NavigationItem?
 
+    @State private var targetedStatus: TripStatus?
+
     var body: some View {
         List(selection: $selection) {
             if !store.pinnedTrips.isEmpty {
@@ -17,23 +19,23 @@ struct SidebarView: View {
             }
 
             Section("Trips") {
-                sidebarRow("Planning", icon: "pencil.and.list.clipboard", tag: .tripsPlanning, count: store.planningTrips.count)
+                sidebarRow("Planning", icon: "pencil.and.list.clipboard", tag: .tripsPlanning, status: .planning, count: store.planningTrips.count)
                     .accessibilityIdentifier("sidebar.planning")
-                sidebarRow("Active", icon: "suitcase.fill", tag: .tripsActive, count: store.activeTrips.count)
+                sidebarRow("Active", icon: "suitcase.fill", tag: .tripsActive, status: .active, count: store.activeTrips.count)
                     .accessibilityIdentifier("sidebar.active")
-                sidebarRow("Completed", icon: "checkmark.circle.fill", tag: .tripsCompleted, count: store.completedTrips.count)
+                sidebarRow("Completed", icon: "checkmark.circle.fill", tag: .tripsCompleted, status: .completed, count: store.completedTrips.count)
                     .accessibilityIdentifier("sidebar.completed")
-                sidebarRow("Archived", icon: "archivebox", tag: .tripsArchived, count: store.archivedTrips.count)
+                sidebarRow("Archived", icon: "archivebox", tag: .tripsArchived, status: .archived, count: store.archivedTrips.count)
                     .accessibilityIdentifier("sidebar.archived")
             }
 
             Section("Templates") {
-                sidebarRow("All Templates", icon: "doc.on.doc", tag: .templates, count: store.templates.count)
+                sidebarRow("All Templates", icon: "doc.on.doc", tag: .templates, status: nil, count: store.templates.count)
                     .accessibilityIdentifier("sidebar.templates")
             }
 
             Section("Manage") {
-                sidebarRow("Tags", icon: "tag", tag: .tags, count: store.tags.count)
+                sidebarRow("Tags", icon: "tag", tag: .tags, status: nil, count: store.tags.count)
                     .accessibilityIdentifier("sidebar.tags")
 
                 Label("Statistics", systemImage: "chart.bar")
@@ -82,8 +84,9 @@ struct SidebarView: View {
         .navigationTitle("PackIt")
     }
 
-    private func sidebarRow(_ title: String, icon: String, tag: NavigationItem, count: Int) -> some View {
-        HStack {
+    private func sidebarRow(_ title: String, icon: String, tag: NavigationItem, status: TripStatus?, count: Int) -> some View {
+        let isTargeted = status != nil && targetedStatus == status
+        return HStack {
             Label(title, systemImage: icon)
             Spacer()
             if count > 0 {
@@ -93,7 +96,41 @@ struct SidebarView: View {
                     .monospacedDigit()
             }
         }
+        .padding(.vertical, 2)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isTargeted ? Color.accentColor.opacity(0.18) : Color.clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(isTargeted ? Color.accentColor : Color.clear, lineWidth: 1.5)
+        )
+        .animation(.easeInOut(duration: 0.15), value: isTargeted)
         .tag(tag)
+        .dropDestination(for: String.self) { items, _ in
+            guard let status else { return false }
+            return moveDroppedTrip(items, to: status)
+        } isTargeted: { targeted in
+            guard let status else { return }
+            if targeted {
+                targetedStatus = status
+            } else if targetedStatus == status {
+                targetedStatus = nil
+            }
+        }
+    }
+
+    private func moveDroppedTrip(_ items: [String], to targetStatus: TripStatus) -> Bool {
+        guard let raw = items.first, let tripID = UUID(uuidString: raw) else { return false }
+        if var trip = store.trips.first(where: { $0.id == tripID }) {
+            if trip.status != targetStatus {
+                trip.status = targetStatus
+                store.updateTrip(trip)
+            }
+            return true
+        }
+        return false
     }
 
     private func pinnedTripRow(_ trip: TripInstance) -> some View {
@@ -107,9 +144,24 @@ struct SidebarView: View {
             Spacer()
         }
         .tag(NavigationItem.tripDetail(trip.id))
+        .draggable(trip.id.uuidString)
         .contextMenu {
-            Button("Unpin", systemImage: "pin.slash") {
+            Button(trip.isPinned ? "Unpin" : "Pin", systemImage: trip.isPinned ? "pin.slash" : "pin") {
                 store.togglePin(tripID: trip.id)
+            }
+            Divider()
+            Picker("Trip Status", selection: Binding(
+                get: { trip.status },
+                set: { newStatus in
+                    var updated = trip
+                    updated.status = newStatus
+                    store.updateTrip(updated)
+                }
+            )) {
+                ForEach(TripStatus.allCases, id: \.self) { status in
+                    Label(status.label, systemImage: status.icon)
+                        .tag(status)
+                }
             }
         }
     }

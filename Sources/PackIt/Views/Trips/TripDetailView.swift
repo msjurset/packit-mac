@@ -43,6 +43,7 @@ struct TripDetailView: View {
     @State private var searchFieldFrame: CGRect = .zero
     @State private var draggingCategory: String?
     @State private var dropTargetCategory: String?
+    @State private var showRemainingPopover = false
 
     enum TripViewMode: String, CaseIterable {
         case packing = "Packing"
@@ -182,6 +183,13 @@ struct TripDetailView: View {
                 window.makeFirstResponder(nil)
             }
             if !showSearch { openSearch() } else { searchSuggestionsDismissed = false }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // Dismiss focus on any click to dead space. This is critical for
+            // NSViewRepresentable fields (like LeadingTextField) which don't
+            // always lose focus when clicking on non-focusable SwiftUI views.
+            NSApp.keyWindow?.makeFirstResponder(nil)
         }
         .onChange(of: isSearchDropdownVisible) { _, visible in
             if visible {
@@ -338,9 +346,35 @@ struct TripDetailView: View {
                                 SharingOutBadge()
                             }
                         }
-                        Text(trip.status.label)
+                        Menu {
+                            Picker("Trip Status", selection: Binding(
+                                get: { trip.status },
+                                set: { newStatus in
+                                    var updated = trip
+                                    updated.status = newStatus
+                                    store.updateTrip(updated)
+                                }
+                            )) {
+                                ForEach(TripStatus.allCases, id: \.self) { status in
+                                    Label(status.label, systemImage: status.icon)
+                                        .tag(status)
+                                }
+                            }
+                            .pickerStyle(.inline)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: trip.status.icon)
+                                    .font(.caption2)
+                                Text(trip.status.label)
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 8, weight: .bold))
+                            }
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .focusable(false)
+                        .help("Click to change trip status (\(trip.status.label))")
                     }
                 }
                 HStack(spacing: 16) {
@@ -391,12 +425,109 @@ struct TripDetailView: View {
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(.secondary)
         }
+        .contentShape(Rectangle())
+        .onTapGesture { showRemainingPopover.toggle() }
+        .popover(isPresented: $showRemainingPopover, arrowEdge: .bottom) {
+            remainingItemsPopover
+        }
+        .help("Click to see remaining items to pack")
     }
 
     private var progressColor: Color {
         if trip.progress >= 1.0 { return .packitGreen }
         if trip.progress >= 0.5 { return .packitTeal }
         return .orange
+    }
+
+    @ViewBuilder
+    private var remainingItemsPopover: some View {
+        let remaining = trip.items.filter { !$0.isPacked }
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Remaining to Pack")
+                .font(.headline)
+
+            if remaining.isEmpty {
+                Text("All packed! 🎉")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        let grouped = Dictionary(grouping: remaining, by: { $0.category ?? "Uncategorized" })
+                        let sortedCategories = store.orderedCategoryNames(Set(grouped.keys))
+
+                        ForEach(sortedCategories, id: \.self) { category in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(category.uppercased())
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(.secondary)
+                                    .tracking(0.5)
+
+                                ForEach(grouped[category] ?? []) { item in
+                                    HStack(spacing: 8) {
+                                        Image(systemName: item.priority.icon)
+                                            .font(.caption2)
+                                            .foregroundStyle(Color.priorityColor(item.priority))
+                                            .frame(width: 14)
+
+                                        Text(item.name)
+                                            .font(.callout)
+                                            .lineLimit(1)
+
+                                        if item.quantity > 1 {
+                                            Text("×\(item.quantity)")
+                                                .font(.caption2.bold().monospacedDigit())
+                                                .foregroundStyle(.packitTeal)
+                                        }
+
+                                        if let owner = item.owner {
+                                            Text(owner)
+                                                .font(.system(size: 9, weight: .medium))
+                                                .padding(.horizontal, 5)
+                                                .padding(.vertical, 1)
+                                                .background(.indigo.opacity(0.12))
+                                                .foregroundStyle(.indigo)
+                                                .clipShape(Capsule())
+                                        }
+                                        Spacer(minLength: 0)
+                                    }
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        selectAndScrollToItem(item.id)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.trailing, 8)
+                }
+                .frame(maxHeight: 400)
+            }
+        }
+        .padding(16)
+        .frame(width: 280)
+    }
+
+    private func selectAndScrollToItem(_ itemID: UUID) {
+        showRemainingPopover = false
+        viewMode = .packing
+
+        if let item = trip.items.first(where: { $0.id == itemID }),
+           let owner = item.owner,
+           !memberFilter.contains(owner) {
+            var updated = memberFilter
+            updated.insert(owner)
+            store.setTripMemberFilter(updated, for: trip.id)
+        }
+
+        selectedItemIDs = [itemID]
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                scrollProxy?.scrollTo(itemID, anchor: .center)
+            }
+        }
     }
 
     // MARK: - Overdue Section
@@ -496,6 +627,7 @@ struct TripDetailView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.packitTeal)
+                .help("Add a new item to this trip (⌘N). Tip: Hold ⌥ Option while hovering over a category to add an item directly to that section.")
             }
 
             if trip.members.count > 1 {
@@ -1452,8 +1584,10 @@ struct CategorySection: View {
                         label: "Category",
                         text: $renameText,
                         isFocused: $isRenameFocused,
-                        autoFocus: true
+                        autoFocus: true,
+                        onSubmit: { commitRename() }
                     )
+
                     .frame(width: 180, height: 22)
                     .onChange(of: isRenameFocused) { _, focused in
                         // NSTextField's controlTextDidEndEditing fires on Enter, Tab,
@@ -1939,9 +2073,9 @@ struct TripInspectorView: View {
 
             if !infoCollapsed {
             VStack(spacing: 6) {
-                infoRow(icon: trip.travelMode.departureSymbol, label: "Departure", value: trip.departureDate.formatted(date: .long, time: .omitted))
+                infoRow(iconView: TravelHeaderIcon(mode: trip.travelMode, direction: .departure), label: "Departure", value: trip.departureDate.formatted(date: .long, time: .omitted))
                 if let ret = trip.returnDate {
-                    infoRow(icon: trip.travelMode.arrivalSymbol, label: "Return", value: ret.formatted(date: .long, time: .omitted))
+                    infoRow(iconView: TravelHeaderIcon(mode: trip.travelMode, direction: .arrival), label: "Return", value: ret.formatted(date: .long, time: .omitted))
                 }
                 infoRow(icon: "suitcase", label: "Status", value: trip.status.label)
                 infoRow(icon: "number", label: "Items", value: "\(trip.totalItems)")
@@ -1956,9 +2090,9 @@ struct TripInspectorView: View {
         }
     }
 
-    private func infoRow(icon: String, label: String, value: String) -> some View {
+    private func infoRow<V: View>(iconView: V, label: String, value: String) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: icon)
+            iconView
                 .font(.caption)
                 .foregroundStyle(.packitTeal)
                 .frame(width: 16)
@@ -1969,6 +2103,10 @@ struct TripInspectorView: View {
             Text(value)
                 .font(.caption)
         }
+    }
+
+    private func infoRow(icon: String, label: String, value: String) -> some View {
+        infoRow(iconView: Image(systemName: icon), label: label, value: value)
     }
 }
 

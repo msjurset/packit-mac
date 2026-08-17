@@ -33,13 +33,22 @@ public enum MealType: String, Codable, CaseIterable, Identifiable, Sendable {
 public struct MealSlot: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID
     public var items: [String]
+    public var icons: [String]
 
-    public init(id: UUID = UUID(), items: [String] = []) {
+    public init(id: UUID = UUID(), items: [String] = [], icons: [String] = []) {
         self.id = id
         self.items = items
+        self.icons = icons
     }
 
-    public var isEmpty: Bool { items.isEmpty }
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        items = try container.decode([String].self, forKey: .items)
+        icons = try container.decodeIfPresent([String].self, forKey: .icons) ?? []
+    }
+
+    public var isEmpty: Bool { items.isEmpty && icons.isEmpty }
     public var display: String { items.joined(separator: ", ") }
 }
 
@@ -80,13 +89,23 @@ public struct MealDay: Codable, Identifiable, Hashable, Sendable {
         }
     }
 
-    public mutating func setSlot(_ type: MealType, items: [String]) {
+    public mutating func setSlot(_ type: MealType, items: [String], icons: [String] = []) {
         switch type {
-        case .breakfast: breakfast.items = items
-        case .lunch: lunch.items = items
-        case .dinner: dinner.items = items
-        case .snacks: snacks.items = items
-        case .beverages: beverages.items = items
+        case .breakfast:
+            breakfast.items = items
+            breakfast.icons = icons
+        case .lunch:
+            lunch.items = items
+            lunch.icons = icons
+        case .dinner:
+            dinner.items = items
+            dinner.icons = icons
+        case .snacks:
+            snacks.items = items
+            snacks.icons = icons
+        case .beverages:
+            beverages.items = items
+            beverages.icons = icons
         }
     }
 }
@@ -109,6 +128,25 @@ public struct MealPlan: Codable, Hashable, Sendable {
             return MealDay(date: date)
         }
         return MealPlan(days: days)
+    }
+
+    /// Update days to match a new date range, preserving existing meal data.
+    public mutating func syncDates(departure: Date, returnDate: Date?) {
+        let end = returnDate ?? Calendar.current.date(byAdding: .day, value: 3, to: departure)!
+        let dayCount = max(1, (Calendar.current.dateComponents([.day], from: departure, to: end).day ?? 0) + 1)
+
+        var newDays: [MealDay] = []
+        for offset in 0..<dayCount {
+            let targetDate = Calendar.current.date(byAdding: .day, value: offset, to: departure)!
+            if offset < days.count {
+                var day = days[offset]
+                day.date = targetDate
+                newDays.append(day)
+            } else {
+                newDays.append(MealDay(date: targetDate))
+            }
+        }
+        self.days = newDays
     }
 
     /// All unique food items across all days and meal types.

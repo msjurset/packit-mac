@@ -63,6 +63,7 @@ struct GraphicalCalendar: NSViewRepresentable {
         Coordinator(selection: $selection, onDaySelected: onDaySelected)
     }
 
+    @MainActor
     final class Coordinator: NSObject {
         @Binding var selection: Date
         var onDaySelected: () -> Void

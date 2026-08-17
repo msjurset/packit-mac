@@ -25,7 +25,7 @@ struct EditTripItemSheet: View {
     }
 
     var body: some View {
-        FormSheet(width: 440, height: 480) {
+        FormSheet(width: 450, height: 560) {
             Section("Item") {
                 LeadingTextField(label: "Name", text: $name)
                 CategoryField(text: $category)
@@ -62,15 +62,23 @@ struct EditTripItemSheet: View {
 
             Section("Notes") {
                 TextEditor(text: $notes)
-                    .frame(minHeight: 80)
+                    .frame(minHeight: 65)
             }
         } footer: {
+            Button(role: .destructive) { removeItem() } label: {
+                Label("Remove", systemImage: "trash")
+            }
+            .focusable(false)
+
+            Spacer()
+
             Button("Cancel") { dismiss() }
                 .keyboardShortcut(.cancelAction)
-            Spacer()
+                .focusable(false)
             Button("Save") { save() }
                 .keyboardShortcut(.defaultAction)
                 .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                .focusable(false)
         }
         .onAppear {
             name = originalItem.name
@@ -96,6 +104,11 @@ struct EditTripItemSheet: View {
             let extras = orderedSelectedOwners.count - 1
             return "On save, this item stays with \(orderedSelectedOwners[0]) and \(extras) duplicate\(extras == 1 ? "" : "s") will be created (one per additional owner)."
         }
+    }
+
+    private func removeItem() {
+        store.removeItem(from: tripID, itemID: originalItem.id)
+        dismiss()
     }
 
     private func save() {

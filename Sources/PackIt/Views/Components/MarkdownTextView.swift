@@ -7,6 +7,7 @@ import AppKit
 /// list item strips the prefix and exits the list.
 struct MarkdownTextView: NSViewRepresentable {
     @Binding var text: String
+    var autoFocus: Bool = true
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -36,6 +37,22 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.usesFindBar = true
         textView.drawsBackground = false
         textView.string = text
+
+        if autoFocus {
+            DispatchQueue.main.async {
+                textView.window?.makeFirstResponder(textView)
+                let len = (textView.string as NSString).length
+                textView.setSelectedRange(NSRange(location: len, length: 0))
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                if textView.window?.firstResponder != textView {
+                    textView.window?.makeFirstResponder(textView)
+                    let len = (textView.string as NSString).length
+                    textView.setSelectedRange(NSRange(location: len, length: 0))
+                }
+            }
+        }
+
         return scrollView
     }
 
@@ -49,6 +66,7 @@ struct MarkdownTextView: NSViewRepresentable {
         }
     }
 
+    @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: MarkdownTextView
         init(_ parent: MarkdownTextView) { self.parent = parent }
@@ -56,6 +74,19 @@ struct MarkdownTextView: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             parent.text = textView.string
+
+            // Handle downward renumbering if an ordered list item was deleted/merged.
+            // We check if the current line is an ordered list and renumber following.
+            let nsString = textView.string as NSString
+            let selection = textView.selectedRange()
+            let lineRange = nsString.lineRange(for: NSRange(location: selection.location, length: 0))
+            let line = nsString.substring(with: lineRange)
+            let indent = String(line.prefix(while: { $0 == " " || $0 == "\t" }))
+            let body = String(line.dropFirst(indent.count))
+
+            if let kind = ListPrefix.detect(in: body), case .ordered(let n) = kind {
+                renumberFollowing(in: textView, from: selection.location, expectedIndent: indent, startNumber: n + 1)
+            }
         }
 
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
@@ -100,6 +131,10 @@ struct MarkdownTextView: NSViewRepresentable {
                 textView.didChangeText()
                 let newCaret = lineRange.location + (replacement as NSString).length
                 textView.setSelectedRange(NSRange(location: newCaret, length: 0))
+
+                if case .ordered(let n) = kind {
+                    renumberFollowing(in: textView, from: newCaret, expectedIndent: indent, startNumber: n)
+                }
                 return true
             }
 
@@ -112,7 +147,60 @@ struct MarkdownTextView: NSViewRepresentable {
             textView.didChangeText()
             let newCaret = selection.location + (insertion as NSString).length
             textView.setSelectedRange(NSRange(location: newCaret, length: 0))
+
+            if case .ordered(let n) = kind {
+                renumberFollowing(in: textView, from: newCaret, expectedIndent: indent, startNumber: n + 2)
+            }
             return true
+        }
+
+        private func renumberFollowing(in textView: NSTextView, from location: Int, expectedIndent: String, startNumber: Int) {
+            var nextNumber = startNumber
+            
+            // 1. Skip the current line (the one containing 'location')
+            let text = textView.string as NSString
+            let currentLineRange = text.lineRange(for: NSRange(location: location, length: 0))
+            var searchFrom = currentLineRange.location + currentLineRange.length
+
+            // 2. Scan subsequent lines
+            while true {
+                let currentText = textView.string as NSString
+                guard searchFrom < currentText.length else { break }
+
+                let lineRange = currentText.lineRange(for: NSRange(location: searchFrom, length: 0))
+                let line = currentText.substring(with: lineRange)
+                
+                // If the line is empty (just a newline), stop.
+                if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { break }
+
+                let indent = String(line.prefix(while: { $0 == " " || $0 == "\t" }))
+                // If indentation doesn't match exactly, stop.
+                guard indent == expectedIndent else { break }
+
+                let body = String(line.dropFirst(indent.count))
+                guard let kind = ListPrefix.detect(in: body),
+                      case .ordered = kind else { 
+                    // Not a list item at this indentation level, stop.
+                    break 
+                }
+
+                let oldPrefixLength = kind.prefixLength
+                let newPrefix = "\(nextNumber). "
+
+                if body.prefix(oldPrefixLength) != newPrefix {
+                    let replaceRange = NSRange(location: lineRange.location + indent.count, length: oldPrefixLength)
+                    if textView.shouldChangeText(in: replaceRange, replacementString: newPrefix) {
+                        textView.textStorage?.replaceCharacters(in: replaceRange, with: newPrefix)
+                        textView.didChangeText()
+                    }
+                }
+
+                // Advance to next line. Refresh length in case prefix changed length.
+                nextNumber += 1
+                let updatedText = textView.string as NSString
+                let updatedLineRange = updatedText.lineRange(for: NSRange(location: lineRange.location, length: 0))
+                searchFrom = updatedLineRange.location + updatedLineRange.length
+            }
         }
     }
 }

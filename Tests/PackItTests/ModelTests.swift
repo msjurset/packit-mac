@@ -147,6 +147,33 @@ struct TripTodoTests {
     }
 }
 
+@Suite("MealPlan")
+struct MealPlanTests {
+    @Test("generate days")
+    func generation() {
+        let departure = Date(timeIntervalSince1970: 1000000) // Some fixed date
+        let returnDate = departure.addingTimeInterval(86400 * 2) // 3 days total
+        let plan = MealPlan.generate(departure: departure, returnDate: returnDate)
+        #expect(plan.days.count == 3)
+        #expect(plan.days[0].date == departure)
+        #expect(plan.days[2].date == returnDate)
+    }
+
+    @Test("sync dates shifts content")
+    func syncDates() {
+        let departure = Date(timeIntervalSince1970: 1000000)
+        var plan = MealPlan.generate(departure: departure, returnDate: departure.addingTimeInterval(86400))
+        plan.days[0].setSlot(.breakfast, items: ["Eggs"])
+
+        let newDeparture = departure.addingTimeInterval(86400 * 10)
+        plan.syncDates(departure: newDeparture, returnDate: newDeparture.addingTimeInterval(86400))
+
+        #expect(plan.days.count == 2)
+        #expect(plan.days[0].date == newDeparture)
+        #expect(plan.days[0].breakfast.items == ["Eggs"])
+    }
+}
+
 @Suite("TripInstance")
 struct TripInstanceTests {
     @Test("progress calculation")
@@ -206,6 +233,26 @@ struct TripInstanceTests {
 
         trip.departureDate = Date.now.addingTimeInterval(10 * 86400)
         #expect(trip.isDepartureSoon == false)
+    }
+
+    @Test("sync sub-model dates")
+    func syncSubModels() {
+        let departure = Date(timeIntervalSince1970: 1000000)
+        var trip = TripInstance(
+            name: "Test",
+            departureDate: departure,
+            prepTasks: [
+                PrepTask(name: "Task", timing: .daysBefore, dueDate: departure.addingTimeInterval(-86400))
+            ],
+            mealPlan: MealPlan.generate(departure: departure, returnDate: departure.addingTimeInterval(86400))
+        )
+
+        let newDeparture = departure.addingTimeInterval(86400 * 5)
+        trip.departureDate = newDeparture
+        trip.syncSubModelDates()
+
+        #expect(trip.prepTasks[0].dueDate == newDeparture.addingTimeInterval(-86400))
+        #expect(trip.mealPlan?.days[0].date == newDeparture)
     }
 }
 
