@@ -70,7 +70,7 @@
 	<key>SUEnableAutomaticChecks</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://raw.githubusercontent.com/msjurset/packit-mac/main/appcast.xml</string>
+	<string>https://tanager.dev/appcasts/packit/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>UEwVMFOzCrec4H3qyVMwgROaxCnPkUbCB4lLz/GnwCg=</string>
 	<key>UTExportedTypeDeclarations</key>
