@@ -10,6 +10,7 @@ struct TripDetailView: View {
     @Environment(PackItStore.self) private var store
     @Environment(\.colorScheme) private var colorScheme
     let trip: TripInstance
+    var showSystemInspector: Bool = true
     @State private var activeSheet: TripSheet?
     @State private var pendingReminders = 0
     @State private var showInspector = true
@@ -256,7 +257,10 @@ struct TripDetailView: View {
                 .help("Toggle TODOs & Notes")
             }
         }
-        .inspector(isPresented: $showInspector) {
+        .inspector(isPresented: Binding(
+            get: { showSystemInspector && showInspector },
+            set: { showInspector = $0 }
+        )) {
             TripInspectorView(trip: trip, activeSheet: $activeSheet, pendingReminders: pendingReminders)
                 .inspectorColumnWidth(min: 250, ideal: 300, max: 380)
         }

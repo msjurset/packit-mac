@@ -5,11 +5,15 @@ import UserNotifications
 actor NotificationService {
     static let shared = NotificationService()
 
-    private let center = UNUserNotificationCenter.current()
+    private var center: UNUserNotificationCenter? {
+        guard Bundle.main.bundleURL.pathExtension == "app" else { return nil }
+        return UNUserNotificationCenter.current()
+    }
 
     // MARK: - Permission
 
     func requestPermission() async -> Bool {
+        guard let center else { return false }
         do {
             return try await center.requestAuthorization(options: [.alert, .sound, .badge])
         } catch {
@@ -18,6 +22,7 @@ actor NotificationService {
     }
 
     func isAuthorized() async -> Bool {
+        guard let center else { return false }
         let settings = await center.notificationSettings()
         return settings.authorizationStatus == .authorized
     }
@@ -25,6 +30,7 @@ actor NotificationService {
     // MARK: - Scheduling
 
     func scheduleDepartureReminder(tripID: UUID, tripName: String, departureDate: Date) async {
+        guard let center else { return }
         let oneDayBefore = Calendar.current.date(byAdding: .day, value: -1, to: departureDate)!
         guard oneDayBefore > .now else { return }
 
@@ -42,6 +48,7 @@ actor NotificationService {
     }
 
     func scheduleOverdueItemReminder(tripID: UUID, tripName: String, itemName: String, dueDate: Date) async {
+        guard let center else { return }
         guard dueDate > .now else { return }
 
         let content = UNMutableNotificationContent()
@@ -58,6 +65,7 @@ actor NotificationService {
     }
 
     func postIncomingShareNotification(count: Int, authors: [String]) async {
+        guard let center else { return }
         let content = UNMutableNotificationContent()
         let sortedAuthors = authors.sorted()
         if count == 1, let author = sortedAuthors.first {
@@ -81,10 +89,12 @@ actor NotificationService {
     // MARK: - Cancellation
 
     func cancelDepartureReminder(tripID: UUID) async {
+        guard let center else { return }
         center.removePendingNotificationRequests(withIdentifiers: [departureReminderID(tripID: tripID)])
     }
 
     func cancelAllReminders(tripID: UUID) async {
+        guard let center else { return }
         let pending = await center.pendingNotificationRequests()
         let prefix = "packit-\(tripID.uuidString)"
         let matching = pending.filter { $0.identifier.hasPrefix(prefix) }.map(\.identifier)
@@ -111,6 +121,7 @@ actor NotificationService {
     // MARK: - Pending Info
 
     func pendingCount(for tripID: UUID) async -> Int {
+        guard let center else { return 0 }
         let pending = await center.pendingNotificationRequests()
         let prefix = "packit-\(tripID.uuidString)"
         return pending.filter { $0.identifier.hasPrefix(prefix) }.count
