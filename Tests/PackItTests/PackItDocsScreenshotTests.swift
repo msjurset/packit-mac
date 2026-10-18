@@ -227,6 +227,10 @@ final class PackItDocsScreenshotTests: XCTestCase {
         )
         try pngData.write(to: outputURL)
         window.orderOut(nil)
+
+        if !callouts.isEmpty && relativePath.hasSuffix(".png") {
+            try renderAnnotatedScreenshot(view, callouts: [], size: size, to: String(relativePath.dropLast(4)) + "_clean.png")
+        }
     }
 
     private func makeSyntheticStore() -> (PackItStore, TripInstance, PackingTemplate) {

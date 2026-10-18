@@ -9,25 +9,34 @@ struct TideTests {
         // Mock hourly heights: sine wave-like
         let heights: [Double] = [0, 1, 2, 1, 0, -1, -2, -1, 0]
         let dates = (0..<heights.count).map { Date(timeIntervalSince1970: TimeInterval($0 * 3600)) }
-        let tideData = zip(dates, heights).map { ($0, $1) }
+        let points = zip(dates, heights).map { (date: $0, heightMeters: $1) }
         
-        var events: [TideEvent] = []
-        for i in 1..<(tideData.count - 1) {
-            let prev = tideData[i-1].1
-            let curr = tideData[i].1
-            let next = tideData[i+1].1
-            
-            if curr > prev && curr > next {
-                events.append(TideEvent(date: tideData[i].0, type: .high, heightMeters: curr))
-            } else if curr < prev && curr < next {
-                events.append(TideEvent(date: tideData[i].0, type: .low, heightMeters: curr))
-            }
-        }
+        let events = TideEvent.processExtrema(points: points)
         
         #expect(events.count == 2)
         #expect(events[0].type == .high)
         #expect(events[0].heightMeters == 2.0)
         #expect(events[1].type == .low)
         #expect(events[1].heightMeters == -2.0)
+    }
+
+    @Test("handles fewer than 3 points without crashing")
+    func boundaryConditions() {
+        let now = Date()
+        
+        // 0 points
+        let emptyEvents = TideEvent.processExtrema(points: [])
+        #expect(emptyEvents.isEmpty)
+        
+        // 1 point
+        let singleEvents = TideEvent.processExtrema(points: [(date: now, heightMeters: 1.0)])
+        #expect(singleEvents.isEmpty)
+        
+        // 2 points
+        let doubleEvents = TideEvent.processExtrema(points: [
+            (date: now, heightMeters: 1.0),
+            (date: now.addingTimeInterval(3600), heightMeters: 2.0)
+        ])
+        #expect(doubleEvents.isEmpty)
     }
 }
