@@ -159,6 +159,24 @@ struct TideEvent: Identifiable, Sendable, Hashable {
         return date.formatted(style)
     }
     var heightFeet: Double { heightMeters * 3.28084 }
+
+    static func processExtrema(points: [(date: Date, heightMeters: Double)], timezoneIdentifier: String = "UTC") -> [TideEvent] {
+        guard points.count >= 3 else { return [] }
+        var events: [TideEvent] = []
+        for i in 1..<(points.count - 1) {
+            let prev = points[i - 1].heightMeters
+            let curr = points[i].heightMeters
+            let next = points[i + 1].heightMeters
+            let date = points[i].date
+            
+            if curr > prev && curr > next {
+                events.append(TideEvent(date: date, type: .high, heightMeters: curr, timezoneIdentifier: timezoneIdentifier))
+            } else if curr < prev && curr < next {
+                events.append(TideEvent(date: date, type: .low, heightMeters: curr, timezoneIdentifier: timezoneIdentifier))
+            }
+        }
+        return events
+    }
 }
 
 // MARK: - Weather Service
@@ -281,31 +299,13 @@ actor WeatherService {
         isoFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
         isoFormatter.timeZone = tz
         
-        struct Point {
-            let date: Date
-            let heightM: Double
-        }
-        
-        var points: [Point] = []
+        var points: [(date: Date, heightMeters: Double)] = []
         for i in 0..<times.count {
             guard i < heights.count, let h = heights[i], let date = isoFormatter.date(from: times[i]) else { continue }
-            points.append(Point(date: date, heightM: h))
+            points.append((date: date, heightMeters: h))
         }
         
-        var events: [TideEvent] = []
-        for i in 1..<(points.count - 1) {
-            let prev = points[i - 1].heightM
-            let curr = points[i].heightM
-            let next = points[i + 1].heightM
-            let date = points[i].date
-            
-            if curr > prev && curr > next {
-                events.append(TideEvent(date: date, type: .high, heightMeters: curr, timezoneIdentifier: timezoneID))
-            } else if curr < prev && curr < next {
-                events.append(TideEvent(date: date, type: .low, heightMeters: curr, timezoneIdentifier: timezoneID))
-            }
-        }
-        return events
+        return TideEvent.processExtrema(points: points, timezoneIdentifier: timezoneID)
     }
 
     private func fetchOpenMeteo(latitude: Double, longitude: Double, startDate: Date, endDate: Date) async throws -> ForecastResult {
